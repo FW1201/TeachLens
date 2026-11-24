@@ -7,7 +7,7 @@
 <p align="center"><b>Fork 開發：<a href="https://www.facebook.com/Journal.of.Digital.Narrative">數位敘事力期刊 Journal of Digital Narrative</a></b></p>
 
 <p align="center">
-  <a href="https://github.com/FW1201/keyviz-for-Mac/releases/latest">⬇︎ 下載最新版</a> ·
+  <a href="https://github.com/FW1201/TeachLens/releases/latest">⬇︎ 下載最新版</a> ·
   <a href="#安裝">安裝</a> ·
   <a href="#快速上手">快速上手</a> ·
   <a href="#功能說明">功能說明</a> ·
@@ -15,7 +15,7 @@
   <a href="docs/DEVELOPMENT.md">開發者文件</a>
 </p>
 
-> English summary: TeachLens is a free, open-source macOS menu-bar toolkit for online teaching — keystroke display with Windows equivalents, spotlight, zoom, on-screen drawing, live captions with transcript export, course-mode presets and screen recording. Download the DMG from [Releases](https://github.com/FW1201/keyviz-for-Mac/releases). Built on ZoomIt for Mac (MIT) and Keyviz (GPL-3.0); licensed GPL-3.0.
+> English summary: TeachLens is a free, open-source macOS menu-bar toolkit for online teaching — keystroke display with Windows equivalents, spotlight, zoom, on-screen drawing, live captions with transcript export, course-mode presets and screen recording. Download the DMG from [Releases](https://github.com/FW1201/TeachLens/releases). Built on ZoomIt for Mac (MIT) and Keyviz (GPL-3.0); licensed GPL-3.0.
 
 ---
 
@@ -49,7 +49,7 @@
 
 ### 1. 下載
 
-到 **[Releases 頁面](https://github.com/FW1201/keyviz-for-Mac/releases/latest)** 下載 `TeachLens-版本.dmg`。
+到 **[Releases 頁面](https://github.com/FW1201/TeachLens/releases/latest)** 下載 `TeachLens-版本.dmg`。
 
 ### 2. 拖進「應用程式」
 

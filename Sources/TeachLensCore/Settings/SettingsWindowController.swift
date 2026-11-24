@@ -36,7 +36,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
     private let spotlightController: SpotlightController?
     private let teaching: TeachingControllers?
 
-    private static let homepageURLString = "https://github.com/FW1201/keyviz-for-Mac"
+    private static let homepageURLString = "https://github.com/FW1201/TeachLens"
     private static let contentWidth: CGFloat = 540
     private static let panelHorizontalInset: CGFloat = 28
     private static let wrappedLabelWidth: CGFloat = contentWidth - panelHorizontalInset * 2
@@ -728,7 +728,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
             wraps: true
         )
         about.textColor = .secondaryLabelColor
-        let link = makeLink(title: "github.com/FW1201/keyviz-for-Mac")
+        let link = makeLink(title: "github.com/FW1201/TeachLens")
 
         return makeColumn([help, launchCheck, languageRow, aboutTitle, about, link])
     }

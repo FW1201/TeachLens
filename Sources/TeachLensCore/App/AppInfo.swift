@@ -33,7 +33,7 @@ public enum AppInfo {
     /// Fork maintainer credit (Journal of Digital Narrative / 數位敘事力期刊).
     public static let forkCredit = "Fork 開發：數位敘事力期刊"
     public static let forkURL = "https://www.facebook.com/Journal.of.Digital.Narrative"
-    public static let repositoryURL = "https://github.com/FW1201/keyviz-for-Mac"
+    public static let repositoryURL = "https://github.com/FW1201/TeachLens"
 
     static func resolveVersion(from infoDictionary: [String: Any]?) -> String {
         for key in ["CFBundleShortVersionString", "CFBundleVersion"] {
