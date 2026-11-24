@@ -162,6 +162,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.applyLanguageChange() }
         }
+        modeCoordinator.onToolsCaptureActivityChanged = { [weak self] active in
+            self?.graphicalTools?.setCaptureActive(active)
+        }
         modeCoordinator.onRecordingStateChanged = { [weak self, weak captionController] recording in
             self?.graphicalTools?.recording = recording
             self?.updateRecordingIndicator(recording)
@@ -181,6 +184,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             appController?.showSettings()
         }
         settingsStore.markFirstLaunchCompleted()
+    }
+
+    public func applicationDidChangeScreenParameters(_ notification: Notification) {
+        graphicalTools?.screenConfigurationChanged()
     }
 
     public func applicationWillTerminate(_ notification: Notification) {

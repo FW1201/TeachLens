@@ -8,6 +8,21 @@ final class GraphicalTools: ObservableObject {
     @Published var recording = false
     private let teaching: TeachingControllers
     private var panel: ToolsPanel?
+    private var dragOffset: NSPoint?
+    private var enabled = false
+    private var captureActive = false
+    private static let positionKey = "graphicalToolsPosition"
+
+    func setCaptureActive(_ active: Bool) {
+        guard captureActive != active else { return }
+        captureActive = active
+        updateVisibility()
+    }
+
+    func screenConfigurationChanged() {
+        guard let panel else { return }
+        place(at: panel.frame.origin)
+    }
 
     init(teaching: TeachingControllers) {
         self.teaching = teaching
@@ -16,7 +31,12 @@ final class GraphicalTools: ObservableObject {
     var windowNumber: Int? { panel?.windowNumber }
 
     func setVisible(_ visible: Bool) {
-        guard visible else {
+        enabled = visible
+        updateVisibility()
+    }
+
+    private func updateVisibility() {
+        guard enabled, !captureActive else {
             expanded = false
             panel?.orderOut(nil)
             return
@@ -36,8 +56,37 @@ final class GraphicalTools: ObservableObject {
             panel = window
         }
         let frame = screen.visibleFrame
-        panel?.setFrame(NSRect(x: frame.maxX - 74, y: frame.minY + 16, width: 58, height: 56), display: true)
+        let saved = UserDefaults.standard.dictionary(forKey: Self.positionKey)
+        let origin = NSPoint(x: saved?["x"] as? Double ?? frame.maxX - 74,
+                             y: saved?["y"] as? Double ?? frame.minY + 16)
+        place(at: origin)
         panel?.orderFrontRegardless()
+    }
+
+    private func place(at origin: NSPoint) {
+        let screen = NSScreen.screens.first { $0.frame.contains(origin) } ?? NSScreen.main
+        guard let bounds = screen?.visibleFrame else { return }
+        let x = min(max(origin.x, bounds.minX), max(bounds.minX, bounds.maxX - 58))
+        let y = min(max(origin.y, bounds.minY), max(bounds.minY, bounds.maxY - 190))
+        panel?.setFrame(NSRect(x: x, y: y, width: 58, height: 56), display: true)
+        resize()
+    }
+
+    private func moveLauncher() {
+        guard !expanded, let panel else { return }
+        let mouse = NSEvent.mouseLocation
+        if dragOffset == nil {
+            dragOffset = NSPoint(x: mouse.x - panel.frame.minX, y: mouse.y - panel.frame.minY)
+        }
+        if let dragOffset {
+            place(at: NSPoint(x: mouse.x - dragOffset.x, y: mouse.y - dragOffset.y))
+        }
+    }
+
+    private func finishMovingLauncher() {
+        guard dragOffset != nil, let panel else { return }
+        dragOffset = nil
+        UserDefaults.standard.set(["x": panel.frame.minX, "y": panel.frame.minY], forKey: Self.positionKey)
     }
 
     func toggleExpanded() {
@@ -77,21 +126,21 @@ final class GraphicalTools: ObservableObject {
     }
 
     private func button(_ title: String, _ icon: String, _ command: AppCommand) -> some View {
-        Button { run(command) } label: { label(title, icon) }
+        Button { self.run(command) } label: { label(title, icon) }
             .buttonStyle(.plain)
             .accessibilityLabel(title)
     }
 
     private func menu<Content: View>(_ title: String, _ icon: String,
                                      @ViewBuilder content: () -> Content) -> some View {
-        Menu(content: content) { label(title, icon) }
+        Menu { content() } label: { self.label(title, icon) }
             .menuStyle(.borderlessButton)
             .accessibilityLabel(title)
             .help(title)
     }
 
     private func item(_ title: String, _ command: AppCommand) -> some View {
-        Button(title) { run(command) }
+        Button(title) { self.run(command) }
     }
 
     @ViewBuilder private var list: some View {
@@ -131,8 +180,8 @@ final class GraphicalTools: ObservableObject {
                 menu(L10n.t("Course Modes", "課程模式"), "square.stack") {
                     ForEach(teaching.courseModes.allModes) { mode in
                         Button(mode.name) {
-                            collapse()
-                            teaching.courseModes.apply(mode)
+                            self.collapse()
+                            self.teaching.courseModes.apply(mode)
                         }
                     }
                 }
@@ -161,6 +210,9 @@ final class GraphicalTools: ObservableObject {
                 #endif
             }
             launcher.frame(height: 50)
+                .simultaneousGesture(DragGesture(minimumDistance: 5)
+                    .onChanged { _ in moveLauncher() }
+                    .onEnded { _ in finishMovingLauncher() })
         }
         .padding(3)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
