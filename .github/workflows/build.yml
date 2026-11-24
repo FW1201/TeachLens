@@ -29,7 +29,13 @@ jobs:
           swift --version
 
       - name: Build
-        run: swift build
+        run: |
+          set -o pipefail
+          if ! swift build 2>&1 | tee build.log; then
+            echo "==================== compiler errors ===================="
+            grep -E "error:" build.log | sort -u | head -80
+            exit 1
+          fi
 
       - name: Self-test
         run: swift run TeachLensSelfTest
