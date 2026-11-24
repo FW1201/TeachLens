@@ -185,6 +185,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             appController?.showSettings()
         }
         settingsStore.markFirstLaunchCompleted()
+
+        // Build the Settings window once the launch work has settled, so the
+        // first "Settings…" doesn't pause while 17 panes are laid out.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            MainActor.assumeIsolated { self?.appController?.prepareSettingsWindow() }
+        }
     }
 
     public func applicationDidChangeScreenParameters(_ notification: Notification) {
@@ -232,7 +238,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             if entry.isSeparator {
                 menu.addItem(.separator())
             } else {
-                menu.addItem(NSMenuItem(title: entry.title, action: entry.action, keyEquivalent: entry.keyEquivalent))
+                let menuItem = NSMenuItem(title: entry.title, action: entry.action, keyEquivalent: entry.keyEquivalent)
+                menuItem.image = Self.menuSymbol(entry.symbol)
+                menu.addItem(menuItem)
             }
         }
 
@@ -252,6 +260,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Course modes sit right below Settings.
         let modesItem = NSMenuItem(title: L10n.t("Course Mode", "課程模式"), action: nil, keyEquivalent: "")
+        modesItem.image = Self.menuSymbol("square.stack")
         modesItem.submenu = courseModes.makeMenu()
         courseModes.menuItem = modesItem
         menu.insertItem(modesItem, at: 1)
@@ -281,6 +290,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         let graphicalItem = NSMenuItem(title: L10n.t("Graphical Mode", "圖形介面模式"),
                                        action: #selector(toggleGraphicalTools(_:)), keyEquivalent: "")
         graphicalItem.target = self
+        graphicalItem.image = Self.menuSymbol("square.grid.2x2")
         graphicalItem.state = UserDefaults.standard.bool(forKey: GraphicalTools.preference) ? .on : .off
         menu.insertItem(graphicalItem, at: 2)
         item.menu = menu
@@ -294,20 +304,36 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         graphicalTools?.setVisible(enabled)
     }
 
+    /// Menu icons are made once and reused across menu rebuilds (language
+    /// changes rebuild the menu).
+    private static var menuSymbolCache: [String: NSImage] = [:]
+
+    static func menuSymbol(_ name: String?) -> NSImage? {
+        guard let name else { return nil }
+        if let cached = menuSymbolCache[name] { return cached }
+        let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)
+        image?.isTemplate = true
+        menuSymbolCache[name] = image
+        return image
+    }
+
     /// A single status-bar menu entry (or a separator when `action` is nil).
     struct StatusMenuEntry {
         let title: String
         let action: Selector?
         let keyEquivalent: String
+        /// The SF Symbol shown beside the title; the same one Graphical Mode uses.
+        let symbol: String?
 
         var isSeparator: Bool { action == nil }
 
         static let separator = StatusMenuEntry(title: "", action: nil, keyEquivalent: "")
 
-        init(title: String, action: Selector?, keyEquivalent: String) {
+        init(title: String, action: Selector?, keyEquivalent: String, symbol: String? = nil) {
             self.title = title
             self.action = action
             self.keyEquivalent = keyEquivalent
+            self.symbol = symbol
         }
     }
 
@@ -317,22 +343,22 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Timer placed at the end of the mode group (below Panorama Capture).
     static func statusMenuEntries() -> [StatusMenuEntry] {
         [
-            StatusMenuEntry(title: L10n.t("Settings…", "設定…"), action: #selector(AppController.showSettings), keyEquivalent: ","),
+            StatusMenuEntry(title: L10n.t("Settings…", "設定…"), action: #selector(AppController.showSettings), keyEquivalent: ",", symbol: "gearshape"),
             .separator,
-            StatusMenuEntry(title: L10n.t("Draw", "畫筆"), action: #selector(AppController.activateDrawWithoutZoom), keyEquivalent: ""),
-            StatusMenuEntry(title: L10n.t("Static Zoom", "靜態放大"), action: #selector(AppController.activateStaticZoom), keyEquivalent: ""),
-            StatusMenuEntry(title: L10n.t("Live Zoom", "即時放大"), action: #selector(AppController.activateLiveZoom), keyEquivalent: ""),
-            StatusMenuEntry(title: L10n.t("Record Screen", "錄製螢幕"), action: #selector(AppController.toggleRecording), keyEquivalent: ""),
-            StatusMenuEntry(title: L10n.t("Panorama Capture", "長截圖"), action: #selector(AppController.startPanorama), keyEquivalent: ""),
-            StatusMenuEntry(title: "DemoMirror", action: #selector(AppController.toggleDemoMirror), keyEquivalent: ""),
-            StatusMenuEntry(title: L10n.t("Break Timer", "休息計時器"), action: #selector(AppController.toggleBreakTimer), keyEquivalent: ""),
-            StatusMenuEntry(title: L10n.t("Show Keystrokes", "顯示按鍵"), action: #selector(AppController.toggleKeystrokes), keyEquivalent: ""),
-            StatusMenuEntry(title: L10n.t("Spotlight", "聚光燈"), action: #selector(AppController.toggleSpotlight), keyEquivalent: ""),
-            StatusMenuEntry(title: L10n.t("Live Captions", "即時字幕"), action: #selector(AppController.toggleCaptions), keyEquivalent: ""),
-            StatusMenuEntry(title: L10n.t("Whiteboard", "白板"), action: #selector(AppController.toggleWhiteboard), keyEquivalent: ""),
+            StatusMenuEntry(title: L10n.t("Draw", "畫筆"), action: #selector(AppController.activateDrawWithoutZoom), keyEquivalent: "", symbol: "pencil.tip"),
+            StatusMenuEntry(title: L10n.t("Static Zoom", "靜態放大"), action: #selector(AppController.activateStaticZoom), keyEquivalent: "", symbol: "plus.magnifyingglass"),
+            StatusMenuEntry(title: L10n.t("Live Zoom", "即時放大"), action: #selector(AppController.activateLiveZoom), keyEquivalent: "", symbol: "dot.viewfinder"),
+            StatusMenuEntry(title: L10n.t("Record Screen", "錄製螢幕"), action: #selector(AppController.toggleRecording), keyEquivalent: "", symbol: "record.circle"),
+            StatusMenuEntry(title: L10n.t("Panorama Capture", "長截圖"), action: #selector(AppController.startPanorama), keyEquivalent: "", symbol: "rectangle.split.1x2"),
+            StatusMenuEntry(title: "DemoMirror", action: #selector(AppController.toggleDemoMirror), keyEquivalent: "", symbol: "rectangle.on.rectangle"),
+            StatusMenuEntry(title: L10n.t("Break Timer", "休息計時器"), action: #selector(AppController.toggleBreakTimer), keyEquivalent: "", symbol: "timer"),
+            StatusMenuEntry(title: L10n.t("Show Keystrokes", "顯示按鍵"), action: #selector(AppController.toggleKeystrokes), keyEquivalent: "", symbol: "command"),
+            StatusMenuEntry(title: L10n.t("Spotlight", "聚光燈"), action: #selector(AppController.toggleSpotlight), keyEquivalent: "", symbol: "lightbulb"),
+            StatusMenuEntry(title: L10n.t("Live Captions", "即時字幕"), action: #selector(AppController.toggleCaptions), keyEquivalent: "", symbol: "captions.bubble"),
+            StatusMenuEntry(title: L10n.t("Whiteboard", "白板"), action: #selector(AppController.toggleWhiteboard), keyEquivalent: "", symbol: "rectangle.and.pencil.and.ellipsis"),
             .separator,
-            StatusMenuEntry(title: L10n.t("Check Permissions", "檢查權限"), action: #selector(AppController.checkPermissions), keyEquivalent: ""),
-            StatusMenuEntry(title: L10n.t("Quit", "結束 TeachLens"), action: #selector(AppController.quit), keyEquivalent: "q")
+            StatusMenuEntry(title: L10n.t("Check Permissions", "檢查權限"), action: #selector(AppController.checkPermissions), keyEquivalent: "", symbol: "checkmark.shield"),
+            StatusMenuEntry(title: L10n.t("Quit", "結束 TeachLens"), action: #selector(AppController.quit), keyEquivalent: "q", symbol: "power")
         ]
     }
 

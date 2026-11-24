@@ -102,6 +102,11 @@ final class AppController: NSObject {
         settingsWindowController.show()
     }
 
+    /// See `SettingsWindowController.prepareWindow()`.
+    func prepareSettingsWindow() {
+        settingsWindowController.prepareWindow()
+    }
+
     @objc func checkPermissions() {
         presentPermissionsDialog()
     }

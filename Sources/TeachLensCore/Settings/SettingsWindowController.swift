@@ -148,6 +148,15 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         super.init()
     }
 
+    /// Builds the window without showing it. Building and measuring every pane
+    /// takes a noticeable moment, so the app does it while idle after launch
+    /// and the first "Settings…" opens instantly.
+    func prepareWindow() {
+        guard window == nil else { return }
+        settings = settingsStore.load()
+        window = makeWindow()
+    }
+
     func show() {
         // Always reflect the latest persisted values when re-opening.
         settings = settingsStore.load()
