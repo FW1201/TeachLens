@@ -4,6 +4,7 @@ import AppKit
 public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var appController: AppController?
+    private var courseModeController: CourseModeController?
 
     public override init() {
         super.init()
@@ -85,6 +86,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             keystrokeController?.recordingFrame()
         }
 
+        let courseModeController = CourseModeController(keystrokes: keystrokeController, spotlight: spotlightController)
+        courseModeController.startBreakTimer = { [weak modeCoordinator] in
+            guard let modeCoordinator, modeCoordinator.mode != .breakTimer else { return }
+            modeCoordinator.handle(.toggleBreakTimer)
+        }
+        self.courseModeController = courseModeController
+
         appController = AppController(
             settingsStore: settingsStore,
             permissionService: permissionService,
@@ -95,13 +103,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             spotlightController: spotlightController
         )
 
-        statusItem = makeStatusItem(controller: appController!)
+        statusItem = makeStatusItem(controller: appController!, courseModes: courseModeController)
         modeCoordinator.onRecordingStateChanged = { [weak self] recording in
             self?.updateRecordingIndicator(recording)
         }
         hotkeyService.start()
         keystrokeController.start()
         spotlightController.start()
+        courseModeController.restoreLastMode()
 
         // On a fresh install, open Settings so the user has a clear entry point
         // instead of a silent menu-bar-only launch (issue #21). Upgrading users
@@ -132,7 +141,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func makeStatusItem(controller: AppController) -> NSStatusItem {
+    private func makeStatusItem(controller: AppController, courseModes: CourseModeController) -> NSStatusItem {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         // Intentionally no autosaveName: persisting an absolute menu-bar slot makes
         // AppKit re-assert that position on every relaunch/relayout, which fights
@@ -173,6 +182,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             optionsItem.submenu = controller.keystrokeController.makeMenu()
             menu.insertItem(optionsItem, at: index + 1)
         }
+        // Course modes sit right below Settings.
+        let modesItem = NSMenuItem(title: L10n.t("Course Mode", "課程模式"), action: nil, keyEquivalent: "")
+        modesItem.submenu = courseModes.makeMenu()
+        courseModes.menuItem = modesItem
+        menu.insertItem(modesItem, at: 1)
+
         if let index = menu.items.firstIndex(where: { $0.action == #selector(AppController.toggleSpotlight) }) {
             let toggleItem = menu.items[index]
             toggleItem.target = controller.spotlightController

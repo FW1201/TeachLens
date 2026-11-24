@@ -7,6 +7,40 @@ enum TeachingSelfTests {
         try testShakeDetector()
         try testSpotlightPathContainsPointer()
         try testSpotlightSettingsDecode()
+        try testCourseModeBuiltIns()
+        try testCourseModeImportExport()
+    }
+
+    private static func testCourseModeBuiltIns() throws {
+        let modes = CourseMode.builtIns
+        try expect(Set(modes.map(\.id)) == CourseMode.builtInIDs, "Expected the four built-in modes")
+        try expect(modes.first { $0.id == "focus" }?.spotlight == true, "Focus mode should turn on the spotlight")
+        try expect(modes.first { $0.id == "break" }?.startBreakTimer == true, "Break mode should start the break timer")
+        for mode in modes {
+            try expect(NSImage(systemSymbolName: mode.symbol, accessibilityDescription: nil) != nil,
+                       "Mode \(mode.id) has an unknown symbol \(mode.symbol)")
+        }
+    }
+
+    private static func testCourseModeImportExport() throws {
+        let custom = CourseMode(id: "custom-1", name: "Lab", keystrokes: true, keystrokeFilter: .none, spotlight: true)
+        let data = try CourseModeStore.encode(CourseMode.builtIns + [custom])
+        let decoded = try CourseModeStore.decode(data)
+        try expect(decoded.count == 5, "Expected five modes back, got \(decoded.count)")
+        try expect(decoded.allSatisfy { !$0.isBuiltIn }, "Imported modes must never replace built-in ids")
+        try expect(decoded.last?.name == "Lab" && decoded.last?.id == "custom-1" && decoded.last?.spotlight == true,
+                   "Custom mode should round-trip")
+        let bare = try CourseModeStore.decode(Data(#"[{"id":"x","name":"Bare"}]"#.utf8))
+        try expect(bare.first?.keystrokes == true && bare.first?.captions == false, "Missing fields should use defaults")
+
+        let suite = "TeachLensSelfTest.Modes.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suite) else { throw SelfTestError.failure("defaults") }
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = CourseModeStore(defaults: defaults)
+        store.saveCustomModes(CourseMode.builtIns + [custom])
+        try expect(store.customModes() == [custom], "Only custom modes should be stored")
+        store.currentModeID = "focus"
+        try expect(store.currentModeID == "focus", "Current mode should persist")
     }
 
     static func expect(_ condition: Bool, _ message: String) throws {
