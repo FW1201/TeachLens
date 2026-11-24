@@ -22,6 +22,29 @@ enum TeachingSelfTests {
         try testGraphicalToolsLayout()
         try testWhiteboardScreenshotScaling()
         try testWhiteboardUndoSkipsNoOps()
+        try testWhiteboardShapesAndPages()
+    }
+
+    private static func testWhiteboardShapesAndPages() throws {
+        // Boards saved before shapes existed still load.
+        let old = Data(#"{"points":[{"x":1,"y":2}],"color":{"r":0,"g":0,"b":0},"width":4,"isHighlighter":false}"#.utf8)
+        let stroke = try JSONDecoder().decode(WhiteboardStroke.self, from: old)
+        try expect(stroke.kind == .free, "Whiteboard: old strokes should load as free strokes")
+
+        var document = WhiteboardDocument()
+        let box = WhiteboardStroke(points: [CGPoint(x: 100, y: 100), CGPoint(x: 300, y: 200)],
+                                   color: WhiteboardColor.palette[0], width: 4, isHighlighter: false, kind: .rectangle)
+        document.currentPage.strokes = [box]
+        document.erase(at: CGPoint(x: 200, y: 150), radius: 10)
+        try expect(document.currentPage.strokes.count == 1, "Whiteboard: erasing inside a box should not hit its outline")
+        document.erase(at: CGPoint(x: 200, y: 100), radius: 10)
+        try expect(document.currentPage.strokes.isEmpty, "Whiteboard: erasing on the box edge should remove it")
+
+        document.addPage()
+        document.addPage()
+        document.currentIndex = 0
+        document.movePage(from: 0, by: 2)
+        try expect(document.currentIndex == 2, "Whiteboard: the moved current page should stay current")
     }
 
     private static func testWhiteboardScreenshotScaling() throws {

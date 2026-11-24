@@ -1,6 +1,7 @@
 import AppKit
 import CoreGraphics
 import ImageIO
+import CoreText
 
 /// Multi-page whiteboard data. Pages use a fixed 16:10 canvas (1600 × 1000
 /// points, top-left origin) so exports look the same at any window size.
@@ -49,11 +50,64 @@ struct WhiteboardColor: Codable, Equatable, Sendable {
     ]
 }
 
+/// What a stroke draws. `free` is a hand-drawn line; the shapes use the first
+/// and last point; text draws `text` at the first point.
+enum WhiteboardStrokeKind: String, Codable, Sendable {
+    case free, line, arrow, rectangle, text
+}
+
 struct WhiteboardStroke: Codable, Equatable, Sendable {
     var points: [CGPoint]
     var color: WhiteboardColor
     var width: Double
     var isHighlighter: Bool
+    var kind: WhiteboardStrokeKind = .free
+    var text: String?
+
+    init(points: [CGPoint], color: WhiteboardColor, width: Double, isHighlighter: Bool,
+         kind: WhiteboardStrokeKind = .free, text: String? = nil) {
+        self.points = points
+        self.color = color
+        self.width = width
+        self.isHighlighter = isHighlighter
+        self.kind = kind
+        self.text = text
+    }
+
+    private enum CodingKeys: String, CodingKey { case points, color, width, isHighlighter, kind, text }
+
+    /// Boards saved before shapes existed have no `kind`; they load as free strokes.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        points = try c.decode([CGPoint].self, forKey: .points)
+        color = try c.decode(WhiteboardColor.self, forKey: .color)
+        width = try c.decode(Double.self, forKey: .width)
+        isHighlighter = try c.decodeIfPresent(Bool.self, forKey: .isHighlighter) ?? false
+        kind = (try? c.decodeIfPresent(WhiteboardStrokeKind.self, forKey: .kind)) ?? .free
+        text = try c.decodeIfPresent(String.self, forKey: .text)
+    }
+
+    /// Font size for text strokes: grows with the chosen line width.
+    var fontSize: CGFloat { CGFloat(18 + width * 4) }
+
+    /// The points the eraser measures against: the outline for shapes, the
+    /// box around text, the polyline otherwise.
+    var hitOutline: [CGPoint] {
+        guard let first = points.first else { return [] }
+        let last = points.last ?? first
+        switch kind {
+        case .free, .line, .arrow:
+            return kind == .free ? points : [first, last]
+        case .rectangle:
+            return [first, CGPoint(x: last.x, y: first.y), last, CGPoint(x: first.x, y: last.y), first]
+        case .text:
+            let size = WhiteboardRenderer.textSize(self)
+            let r = CGRect(origin: first, size: size)
+            return [CGPoint(x: r.minX, y: r.minY), CGPoint(x: r.maxX, y: r.minY), CGPoint(x: r.maxX, y: r.maxY),
+                    CGPoint(x: r.minX, y: r.maxY), CGPoint(x: r.minX, y: r.minY),
+                    CGPoint(x: r.maxX, y: r.maxY)]
+        }
+    }
 }
 
 struct WhiteboardPage: Codable, Equatable, Sendable {
@@ -89,6 +143,22 @@ struct WhiteboardDocument: Codable, Equatable, Sendable {
         currentIndex = min(currentIndex, pages.count - 1)
     }
 
+    /// Moves a page one or more places earlier (negative) or later, keeping
+    /// the same page current.
+    mutating func movePage(from index: Int, by delta: Int) {
+        let target = min(max(0, index + delta), pages.count - 1)
+        guard pages.indices.contains(index), target != index else { return }
+        let page = pages.remove(at: index)
+        pages.insert(page, at: target)
+        if currentIndex == index {
+            currentIndex = target
+        } else if index < currentIndex, target >= currentIndex {
+            currentIndex -= 1
+        } else if index > currentIndex, target <= currentIndex {
+            currentIndex += 1
+        }
+    }
+
     mutating func go(_ delta: Int) {
         currentIndex = min(max(0, currentIndex + delta), pages.count - 1)
     }
@@ -96,7 +166,7 @@ struct WhiteboardDocument: Codable, Equatable, Sendable {
     /// Removes strokes that pass within `radius` of `point` on the current page.
     mutating func erase(at point: CGPoint, radius: Double) {
         currentPage.strokes.removeAll { stroke in
-            Self.distance(from: point, to: stroke.points) <= radius + stroke.width / 2
+            Self.distance(from: point, to: stroke.hitOutline) <= radius + stroke.width / 2
         }
     }
 
@@ -167,19 +237,67 @@ enum WhiteboardRenderer {
         context.restoreGState()
     }
 
-    /// Strokes one line in canvas coordinates; the caller sets round caps.
+    /// Draws one stroke in canvas coordinates; the caller sets round caps.
     static func stroke(_ stroke: WhiteboardStroke, in context: CGContext) {
         guard let first = stroke.points.first else { return }
-        context.setStrokeColor(stroke.color.cgColor.copy(alpha: stroke.isHighlighter ? 0.35 : 1) ?? stroke.color.cgColor)
+        let last = stroke.points.last ?? first
+        let color = stroke.color.cgColor.copy(alpha: stroke.isHighlighter ? 0.35 : 1) ?? stroke.color.cgColor
+        context.setStrokeColor(color)
         context.setLineWidth(stroke.width)
         context.beginPath()
-        context.move(to: first)
-        if stroke.points.count == 1 {
-            context.addLine(to: CGPoint(x: first.x + 0.1, y: first.y))
-        } else {
-            context.addLines(between: stroke.points)
+        switch stroke.kind {
+        case .free:
+            context.move(to: first)
+            if stroke.points.count == 1 {
+                context.addLine(to: CGPoint(x: first.x + 0.1, y: first.y))
+            } else {
+                context.addLines(between: stroke.points)
+            }
+            context.strokePath()
+        case .line:
+            context.addLines(between: [first, last])
+            context.strokePath()
+        case .arrow:
+            context.addLines(between: [first, last])
+            let angle: CGFloat = atan2(last.y - first.y, last.x - first.x)
+            let head = CGFloat(max(14, stroke.width * 4))
+            for side: CGFloat in [-1, 1] {
+                let a: CGFloat = angle + .pi - side * .pi / 7
+                context.move(to: last)
+                context.addLine(to: CGPoint(x: last.x + head * cos(a), y: last.y + head * sin(a)))
+            }
+            context.strokePath()
+        case .rectangle:
+            context.addRect(CGRect(x: min(first.x, last.x), y: min(first.y, last.y),
+                                   width: abs(last.x - first.x), height: abs(last.y - first.y)))
+            context.strokePath()
+        case .text:
+            drawText(stroke, in: context, color: color)
         }
-        context.strokePath()
+    }
+
+    private static func textAttributes(_ stroke: WhiteboardStroke, color: CGColor) -> [NSAttributedString.Key: Any] {
+        [.font: NSFont.systemFont(ofSize: stroke.fontSize, weight: .semibold),
+         .foregroundColor: NSColor(cgColor: color) ?? .black]
+    }
+
+    static func textSize(_ stroke: WhiteboardStroke) -> CGSize {
+        let string = NSAttributedString(string: stroke.text ?? "", attributes: textAttributes(stroke, color: stroke.color.cgColor))
+        return string.size()
+    }
+
+    /// Text in a top-left-origin context: flip locally so glyphs stand upright.
+    private static func drawText(_ stroke: WhiteboardStroke, in context: CGContext, color: CGColor) {
+        guard let text = stroke.text, !text.isEmpty, let origin = stroke.points.first else { return }
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: textAttributes(stroke, color: color)))
+        var ascent: CGFloat = 0, descent: CGFloat = 0, leading: CGFloat = 0
+        _ = CTLineGetTypographicBounds(line, &ascent, &descent, &leading)
+        context.saveGState()
+        context.translateBy(x: origin.x, y: origin.y + ascent)
+        context.scaleBy(x: 1, y: -1)
+        context.textPosition = .zero
+        CTLineDraw(line, context)
+        context.restoreGState()
     }
 
     static func aspectFit(_ content: CGSize, in rect: CGRect) -> CGRect {
