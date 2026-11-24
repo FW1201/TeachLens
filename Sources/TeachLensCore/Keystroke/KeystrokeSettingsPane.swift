@@ -24,7 +24,14 @@ struct KeystrokeSettingsPane: View {
                 }
                 Toggle(L10n.t("Include mouse clicks in shortcuts", "快捷鍵包含滑鼠點擊"), isOn: $draft.showMouseEvents)
                 Toggle(L10n.t("Click ripples at the pointer", "點擊時顯示漣漪"), isOn: $draft.showClickRipples)
-                Toggle(L10n.t("Show Windows equivalents (Windows 對照)", "開啟 Windows 對照"), isOn: $draft.windowsEquivalent)
+                Toggle(isOn: $draft.windowsEquivalent) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(L10n.t("Show Windows equivalents", "開啟 Windows 對照"))
+                        Text(L10n.t("Suggested equivalents; the actual shortcut depends on the app.",
+                                    "建議對照，實際快捷鍵依軟體而異。"))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
                 Toggle(L10n.t("Keep recent shortcuts", "保留最近的快捷鍵"), isOn: $draft.showHistory)
                 if draft.showHistory {
                     Stepper(L10n.t("Recent shortcuts: \(draft.maxHistory)", "最近快捷鍵：\(draft.maxHistory)"), value: $draft.maxHistory, in: 2...6)
@@ -95,6 +102,7 @@ struct KeystrokeSettingsPane: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
         .onAppear {
             if !didLoad {
                 draft = model.settings
@@ -108,6 +116,10 @@ struct KeystrokeSettingsPane: View {
         }
         .onChange(of: draft) { _, newValue in
             guard didLoad, newValue != model.settings else { return }
+            if newValue.filter == .none && model.settings.filter != .none && !KeystrokeController.confirmEveryKey() {
+                draft.filter = model.settings.filter
+                return
+            }
             controller.update { $0 = newValue }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in

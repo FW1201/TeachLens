@@ -102,7 +102,7 @@ final class CaptionController: NSObject, NSMenuItemValidation {
 
     private(set) var transcript: [CaptionSegment] = []
     private var recordingStart: TimeInterval?
-    private var lastRecording: (start: TimeInterval, end: TimeInterval)?
+    private(set) var lastRecording: (start: TimeInterval, end: TimeInterval)?
 
     var onHotkeyChange: (() -> Void)?
 
@@ -334,6 +334,21 @@ final class CaptionController: NSObject, NSMenuItemValidation {
 
     // MARK: Overlay
 
+    /// Shows a sample caption without the microphone (Settings ▸ Check & Test).
+    func showSample() {
+        ensurePanel()
+        model.status = nil
+        model.text = L10n.t("This is a sample caption. Live captions appear here while you speak.",
+                            "這是字幕示範。開啟即時字幕後，你說的話會顯示在這裡。")
+        lastShownAt = Self.now()
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            guard let self, !self.isRunning else { return }
+            self.model.text = ""
+            self.panel?.orderOut(nil)
+        }
+    }
+
     private func ensurePanel() {
         if panel == nil {
             let panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
@@ -379,7 +394,12 @@ final class CaptionController: NSObject, NSMenuItemValidation {
         case "vtt": body = CaptionFormatter.vtt(segments)
         default: body = CaptionFormatter.plainText(segments)
         }
-        try? body.write(to: url, atomically: true, encoding: .utf8)
+        do {
+            try body.write(to: url, atomically: true, encoding: .utf8)
+            ExportFeedback.saved(url)
+        } catch {
+            ExportFeedback.failed(error)
+        }
     }
 
     private func currentTranscript() -> [CaptionSegment] {
@@ -393,17 +413,17 @@ final class CaptionController: NSObject, NSMenuItemValidation {
         return f.string(from: Date())
     }
 
-    @objc private func exportSRT() { export("srt", segments: currentTranscript(), name: "TeachLens Transcript \(Self.dateStamp())") }
-    @objc private func exportVTT() { export("vtt", segments: currentTranscript(), name: "TeachLens Transcript \(Self.dateStamp())") }
-    @objc private func exportTXT() { export("txt", segments: currentTranscript(), name: "TeachLens Transcript \(Self.dateStamp())") }
+    @objc func exportSRT() { export("srt", segments: currentTranscript(), name: "TeachLens Transcript \(Self.dateStamp())") }
+    @objc func exportVTT() { export("vtt", segments: currentTranscript(), name: "TeachLens Transcript \(Self.dateStamp())") }
+    @objc func exportTXT() { export("txt", segments: currentTranscript(), name: "TeachLens Transcript \(Self.dateStamp())") }
 
-    @objc private func exportLastRecording() {
+    @objc func exportLastRecording() {
         guard let range = lastRecording else { return }
         export("srt", segments: CaptionFormatter.slice(currentTranscript(), from: range.start, to: range.end),
                name: "TeachLens Recording \(Self.dateStamp())")
     }
 
-    @objc private func clearTranscript() {
+    @objc func clearTranscript() {
         transcript = []
         lastRecording = nil
         sessionStart = Self.now()

@@ -165,6 +165,27 @@ final class CourseModeController: NSObject, NSMenuItemValidation {
         apply(restored, showToast: false)
     }
 
+    private var restorePoint: CourseMode?
+    private var restoreModeID: String?
+
+    /// Remembers what is on now, before trying modes from Check & Test.
+    func saveRestorePoint() {
+        guard restorePoint == nil else { return }
+        restorePoint = snapshot(name: "restore")
+        restoreModeID = currentModeID
+    }
+
+    var hasRestorePoint: Bool { restorePoint != nil }
+
+    /// Puts back what was on before the first test.
+    func restoreTestState() {
+        guard let point = restorePoint else { return }
+        apply(point, showToast: false)
+        currentModeID = restoreModeID
+        store.currentModeID = restoreModeID
+        restorePoint = nil
+    }
+
     func apply(_ mode: CourseMode, showToast: Bool = true) {
         keystrokes.update {
             $0.enabled = mode.keystrokes
@@ -247,7 +268,7 @@ final class CourseModeController: NSObject, NSMenuItemValidation {
         apply(mode)
     }
 
-    @objc private func saveCurrent() {
+    @objc func saveCurrent() {
         let alert = NSAlert()
         alert.messageText = L10n.t("Save current setup as a course mode", "將目前設定存成課程模式")
         alert.informativeText = L10n.t(
@@ -271,7 +292,7 @@ final class CourseModeController: NSObject, NSMenuItemValidation {
         rebuildMenu()
     }
 
-    @objc private func importModes() {
+    @objc func importModes() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.json]
         panel.allowsMultipleSelection = false
@@ -293,16 +314,21 @@ final class CourseModeController: NSObject, NSMenuItemValidation {
         }
     }
 
-    @objc private func exportModes() {
+    @objc func exportModes() {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
         panel.nameFieldStringValue = "TeachLens Course Modes.json"
         NSApp.activate(ignoringOtherApps: true)
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        try? CourseModeStore.encode(allModes).write(to: url)
+        do {
+            try CourseModeStore.encode(allModes).write(to: url)
+            ExportFeedback.saved(url)
+        } catch {
+            ExportFeedback.failed(error)
+        }
     }
 
-    @objc private func removeCustomModes() {
+    @objc func removeCustomModes() {
         customModes = []
         store.saveCustomModes([])
         if let id = currentModeID, !CourseMode.builtInIDs.contains(id) {

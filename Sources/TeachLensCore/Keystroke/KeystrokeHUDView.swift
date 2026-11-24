@@ -179,7 +179,7 @@ struct KeystrokeComboView: View {
                 HStack(spacing: 6 * s) {
                     Image(systemName: "pc")
                         .font(.system(size: 12 * s, weight: .semibold))
-                    Text("Windows")
+                    Text(L10n.t("Windows ≈", "Windows 建議"))
                         .font(.system(size: 11 * s, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.7))
                     Text(windows)

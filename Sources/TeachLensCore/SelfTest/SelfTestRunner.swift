@@ -876,6 +876,10 @@ public enum SelfTestRunner {
     /// macOS-only extra after Record and the Break Timer placed below Panorama
     /// Capture.
     private static func testStatusMenuOrderMatchesWindows() throws {
+        // Titles are checked in English; the menu also exists in Chinese.
+        let previous = L10n.forcedLanguage
+        L10n.forcedLanguage = "en"
+        defer { L10n.forcedLanguage = previous }
         let titles = AppDelegate.statusMenuEntries()
             .filter { !$0.isSeparator }
             .map(\.title)

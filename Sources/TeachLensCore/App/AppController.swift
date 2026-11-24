@@ -10,6 +10,8 @@ final class AppController: NSObject {
     let keystrokeController: KeystrokeController
     let spotlightController: SpotlightController
     let captionController: CaptionController
+    /// Set by AppDelegate before Settings is first opened.
+    var teaching: TeachingControllers?
     /// One-shot observer used to re-present the permissions dialog when the user
     /// returns to TeachLens after being sent to System Settings.
     private var permissionReactivationObserver: NSObjectProtocol?
@@ -24,7 +26,8 @@ final class AppController: NSObject {
         onOpenTrimEditor: { [weak self] in self?.modeCoordinator.openTrimEditor() },
         userSelectedResourceAccess: userSelectedResourceAccess,
         keystrokeController: keystrokeController,
-        spotlightController: spotlightController
+        spotlightController: spotlightController,
+        teaching: teaching
     )
 
     init(
@@ -91,6 +94,10 @@ final class AppController: NSObject {
     /// Replaced by WhiteboardController.toggle when the menu is built.
     @objc func toggleWhiteboard() {}
 
+    func reloadSettingsForLanguageChange() {
+        settingsWindowController.reloadForLanguageChange()
+    }
+
     @objc func showSettings() {
         settingsWindowController.show()
     }
@@ -115,38 +122,48 @@ final class AppController: NSObject {
         let inputMonitoringGranted = InputMonitoringPermission.isGranted
         func describe(_ status: MicrophonePermission) -> String {
             switch status {
-            case .granted: return "Granted"
-            case .denied: return "Denied"
-            case .notDetermined: return "Not requested"
+            case .granted: return L10n.t("Granted", "已允許")
+            case .denied: return L10n.t("Denied", "已拒絕")
+            case .notDetermined: return L10n.t("Not requested", "尚未要求")
             }
         }
         func describe(_ status: SpeechRecognitionPermission) -> String {
             switch status {
-            case .granted: return "Granted"
-            case .denied: return "Denied"
-            case .notDetermined: return "Not requested"
+            case .granted: return L10n.t("Granted", "已允許")
+            case .denied: return L10n.t("Denied", "已拒絕")
+            case .notDetermined: return L10n.t("Not requested", "尚未要求")
             }
         }
 
         let alert = NSAlert()
-        alert.messageText = "TeachLens Permissions"
-        alert.informativeText = """
-        Screen Recording: \(screenGranted ? "Granted" : "Missing")
+        alert.messageText = L10n.t("TeachLens Permissions", "TeachLens 權限")
+        let screenText = screenGranted ? L10n.t("Granted", "已允許") : L10n.t("Missing", "未允許")
+        let inputText = inputMonitoringGranted ? L10n.t("Granted", "已允許") : L10n.t("Missing", "未允許")
+        alert.informativeText = L10n.t("""
+        Screen Recording: \(screenText)
+        Input Monitoring: \(inputText)
         Microphone: \(describe(micStatus))
         Speech Recognition: \(describe(speechStatus))
         Camera: \(describe(camStatus))
-        Input Monitoring: \(inputMonitoringGranted ? "Granted" : "Missing")
 
-        Screen Recording is required for zoom, snip, and recording. Microphone and Speech Recognition are optional for snip dictation; Camera is optional for recording. Input Monitoring is required to show keystrokes.
+        Screen Recording: zoom, snip, record. Input Monitoring: keystrokes. Microphone + Speech Recognition: captions. Camera: optional.
+        Relaunch TeachLens after granting Screen Recording or Input Monitoring.
+        """, """
+        螢幕錄製：\(screenText)
+        輸入監控：\(inputText)
+        麥克風：\(describe(micStatus))
+        語音辨識：\(describe(speechStatus))
+        相機：\(describe(camStatus))
 
-        Newly granted Screen Recording takes effect after you relaunch TeachLens.
-        """
-        alert.addButton(withTitle: "Done")
-        alert.addButton(withTitle: screenGranted ? "Screen Recording Settings…" : "Grant Screen Recording…")
-        alert.addButton(withTitle: micStatus == .notDetermined ? "Grant Microphone…" : "Microphone Settings…")
-        alert.addButton(withTitle: speechStatus == .notDetermined ? "Grant Speech Recognition…" : "Speech Recognition Settings…")
-        alert.addButton(withTitle: camStatus == .notDetermined ? "Grant Camera…" : "Camera Settings…")
-        alert.addButton(withTitle: inputMonitoringGranted ? "Input Monitoring Settings…" : "Grant Input Monitoring…")
+        螢幕錄製：放大、截圖、錄影。輸入監控：按鍵顯示。麥克風＋語音辨識：字幕。相機：選用。
+        開啟螢幕錄製或輸入監控後，請重新打開 TeachLens。
+        """)
+        alert.addButton(withTitle: L10n.t("Done", "完成"))
+        alert.addButton(withTitle: screenGranted ? L10n.t("Screen Recording Settings…", "螢幕錄製設定…") : L10n.t("Grant Screen Recording…", "允許螢幕錄製…"))
+        alert.addButton(withTitle: micStatus == .notDetermined ? L10n.t("Grant Microphone…", "允許麥克風…") : L10n.t("Microphone Settings…", "麥克風設定…"))
+        alert.addButton(withTitle: speechStatus == .notDetermined ? L10n.t("Grant Speech Recognition…", "允許語音辨識…") : L10n.t("Speech Recognition Settings…", "語音辨識設定…"))
+        alert.addButton(withTitle: camStatus == .notDetermined ? L10n.t("Grant Camera…", "允許相機…") : L10n.t("Camera Settings…", "相機設定…"))
+        alert.addButton(withTitle: inputMonitoringGranted ? L10n.t("Input Monitoring Settings…", "輸入監控設定…") : L10n.t("Grant Input Monitoring…", "允許輸入監控…"))
         // Use a standard macOS-style rounded-square icon so the dialog matches
         // the look of system permission prompts and the icon top lines up with
         // the message text.

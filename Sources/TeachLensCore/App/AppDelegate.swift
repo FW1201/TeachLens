@@ -6,6 +6,17 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var appController: AppController?
     private var courseModeController: CourseModeController?
     private var whiteboardController: WhiteboardController?
+    private var languageObserver: NSObjectProtocol?
+
+    /// Rebuilds the status menu and Settings in the newly chosen language.
+    private func applyLanguageChange() {
+        guard let appController, let courseModeController else { return }
+        if let statusItem {
+            NSStatusBar.system.removeStatusItem(statusItem)
+        }
+        statusItem = makeStatusItem(controller: appController, courseModes: courseModeController)
+        appController.reloadSettingsForLanguageChange()
+    }
 
     public override init() {
         super.init()
@@ -51,8 +62,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             userSelectedResourceAccess: userSelectedResourceAccess
         )
 
+        let testCenter = TestCenter(permissionService: permissionService)
         let hotkeyService = HotkeyService(settingsStore: settingsStore) { command in
             Task { @MainActor in
+                testCenter.record(command)
                 modeCoordinator.handle(command)
             }
         }
@@ -127,7 +140,22 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             captionController: captionController
         )
 
+        appController?.teaching = TeachingControllers(
+            keystrokes: keystrokeController,
+            spotlight: spotlightController,
+            captions: captionController,
+            courseModes: courseModeController,
+            whiteboard: whiteboardController,
+            testCenter: testCenter,
+            run: { [weak modeCoordinator] command in modeCoordinator?.handle(command) }
+        )
+
         statusItem = makeStatusItem(controller: appController!, courseModes: courseModeController)
+        languageObserver = NotificationCenter.default.addObserver(
+            forName: L10n.didChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.applyLanguageChange() }
+        }
         modeCoordinator.onRecordingStateChanged = { [weak self, weak captionController] recording in
             self?.updateRecordingIndicator(recording)
             captionController?.recordingStateChanged(recording)
@@ -262,22 +290,22 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Timer placed at the end of the mode group (below Panorama Capture).
     static func statusMenuEntries() -> [StatusMenuEntry] {
         [
-            StatusMenuEntry(title: "Settings…", action: #selector(AppController.showSettings), keyEquivalent: ","),
+            StatusMenuEntry(title: L10n.t("Settings…", "設定…"), action: #selector(AppController.showSettings), keyEquivalent: ","),
             .separator,
-            StatusMenuEntry(title: "Draw", action: #selector(AppController.activateDrawWithoutZoom), keyEquivalent: ""),
-            StatusMenuEntry(title: "Static Zoom", action: #selector(AppController.activateStaticZoom), keyEquivalent: ""),
-            StatusMenuEntry(title: "Live Zoom", action: #selector(AppController.activateLiveZoom), keyEquivalent: ""),
-            StatusMenuEntry(title: "Record Screen", action: #selector(AppController.toggleRecording), keyEquivalent: ""),
-            StatusMenuEntry(title: "Panorama Capture", action: #selector(AppController.startPanorama), keyEquivalent: ""),
+            StatusMenuEntry(title: L10n.t("Draw", "畫筆"), action: #selector(AppController.activateDrawWithoutZoom), keyEquivalent: ""),
+            StatusMenuEntry(title: L10n.t("Static Zoom", "靜態放大"), action: #selector(AppController.activateStaticZoom), keyEquivalent: ""),
+            StatusMenuEntry(title: L10n.t("Live Zoom", "即時放大"), action: #selector(AppController.activateLiveZoom), keyEquivalent: ""),
+            StatusMenuEntry(title: L10n.t("Record Screen", "錄製螢幕"), action: #selector(AppController.toggleRecording), keyEquivalent: ""),
+            StatusMenuEntry(title: L10n.t("Panorama Capture", "長截圖"), action: #selector(AppController.startPanorama), keyEquivalent: ""),
             StatusMenuEntry(title: "DemoMirror", action: #selector(AppController.toggleDemoMirror), keyEquivalent: ""),
-            StatusMenuEntry(title: "Break Timer", action: #selector(AppController.toggleBreakTimer), keyEquivalent: ""),
+            StatusMenuEntry(title: L10n.t("Break Timer", "休息計時器"), action: #selector(AppController.toggleBreakTimer), keyEquivalent: ""),
             StatusMenuEntry(title: L10n.t("Show Keystrokes", "顯示按鍵"), action: #selector(AppController.toggleKeystrokes), keyEquivalent: ""),
             StatusMenuEntry(title: L10n.t("Spotlight", "聚光燈"), action: #selector(AppController.toggleSpotlight), keyEquivalent: ""),
             StatusMenuEntry(title: L10n.t("Live Captions", "即時字幕"), action: #selector(AppController.toggleCaptions), keyEquivalent: ""),
             StatusMenuEntry(title: L10n.t("Whiteboard", "白板"), action: #selector(AppController.toggleWhiteboard), keyEquivalent: ""),
             .separator,
-            StatusMenuEntry(title: "Check Permissions", action: #selector(AppController.checkPermissions), keyEquivalent: ""),
-            StatusMenuEntry(title: "Quit", action: #selector(AppController.quit), keyEquivalent: "q")
+            StatusMenuEntry(title: L10n.t("Check Permissions", "檢查權限"), action: #selector(AppController.checkPermissions), keyEquivalent: ""),
+            StatusMenuEntry(title: L10n.t("Quit", "結束 TeachLens"), action: #selector(AppController.quit), keyEquivalent: "q")
         ]
     }
 
