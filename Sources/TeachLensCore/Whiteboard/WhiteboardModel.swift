@@ -77,8 +77,24 @@ struct WhiteboardDocument: Codable, Equatable, Sendable {
     /// Removes strokes that pass within `radius` of `point` on the current page.
     mutating func erase(at point: CGPoint, radius: Double) {
         currentPage.strokes.removeAll { stroke in
-            stroke.points.contains { hypot($0.x - point.x, $0.y - point.y) <= radius + stroke.width / 2 }
+            Self.distance(from: point, to: stroke.points) <= radius + stroke.width / 2
         }
+    }
+
+    /// Shortest distance from `point` to the polyline through `points`
+    /// (segments, not just vertices, so sparse fast strokes erase too).
+    static func distance(from point: CGPoint, to points: [CGPoint]) -> Double {
+        guard let first = points.first else { return .infinity }
+        var best = hypot(point.x - first.x, point.y - first.y)
+        for (a, b) in zip(points, points.dropFirst()) {
+            let dx = b.x - a.x, dy = b.y - a.y
+            let lengthSquared = dx * dx + dy * dy
+            var t = lengthSquared > 0 ? ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSquared : 0
+            t = min(max(t, 0), 1)
+            let px = a.x + t * dx, py = a.y + t * dy
+            best = min(best, hypot(point.x - px, point.y - py))
+        }
+        return best
     }
 }
 
