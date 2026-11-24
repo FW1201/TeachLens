@@ -9,6 +9,7 @@ final class AppController: NSObject {
     private let userSelectedResourceAccess: UserSelectedResourceAccess
     let keystrokeController: KeystrokeController
     let spotlightController: SpotlightController
+    let captionController: CaptionController
     /// One-shot observer used to re-present the permissions dialog when the user
     /// returns to TeachLens after being sent to System Settings.
     private var permissionReactivationObserver: NSObjectProtocol?
@@ -33,7 +34,8 @@ final class AppController: NSObject {
         modeCoordinator: ModeCoordinator,
         userSelectedResourceAccess: UserSelectedResourceAccess,
         keystrokeController: KeystrokeController,
-        spotlightController: SpotlightController
+        spotlightController: SpotlightController,
+        captionController: CaptionController
     ) {
         self.settingsStore = settingsStore
         self.permissionService = permissionService
@@ -42,6 +44,7 @@ final class AppController: NSObject {
         self.userSelectedResourceAccess = userSelectedResourceAccess
         self.keystrokeController = keystrokeController
         self.spotlightController = spotlightController
+        self.captionController = captionController
         super.init()
     }
 
@@ -79,6 +82,10 @@ final class AppController: NSObject {
 
     @objc func toggleSpotlight() {
         spotlightController.toggleSpotlight()
+    }
+
+    @objc func toggleCaptions() {
+        captionController.toggle()
     }
 
     @objc func showSettings() {

@@ -10,6 +10,36 @@ enum TeachingSelfTests {
         try testCourseModeBuiltIns()
         try testCourseModeImportExport()
         try testWindowsEquivalents()
+        try testCaptionFormats()
+        try testCaptionSentenceTracker()
+    }
+
+    private static func testCaptionFormats() throws {
+        let segments = [
+            CaptionSegment(start: 1.5, end: 4.25, text: "大家好"),
+            CaptionSegment(start: 3_661.0, end: 3_663.5, text: "Second line"),
+        ]
+        let srt = CaptionFormatter.srt(segments)
+        try expect(srt.hasPrefix("1\n00:00:01,500 --> 00:00:04,250\n大家好\n"), "Unexpected SRT:\n\(srt)")
+        try expect(srt.contains("2\n01:01:01,000 --> 01:01:03,500\nSecond line"), "Hours should be formatted")
+        let vtt = CaptionFormatter.vtt(segments)
+        try expect(vtt.hasPrefix("WEBVTT\n\n00:00:01.500 --> 00:00:04.250\n大家好"), "Unexpected VTT:\n\(vtt)")
+        let sliced = CaptionFormatter.slice(segments, from: 2, to: 10)
+        try expect(sliced.count == 1 && sliced[0].start == 0 && sliced[0].end == 2.25,
+                   "Slicing should shift times to the recording start, got \(sliced)")
+    }
+
+    private static func testCaptionSentenceTracker() throws {
+        var tracker = CaptionSentenceTracker()
+        tracker.partial("今天", at: 10)
+        tracker.partial("今天我們", at: 10.4)
+        try expect(tracker.finishIfDue(at: 11) == nil, "No pause yet")
+        let segment = tracker.finishIfDue(at: 11.7)
+        try expect(segment == CaptionSegment(start: 10, end: 10.4, text: "今天我們"), "Pause should end the sentence, got \(String(describing: segment))")
+        try expect(tracker.finishIfDue(at: 20) == nil, "Tracker should be empty after finishing")
+        tracker.partial("long", at: 30)
+        for i in 1...60 { tracker.partial("long \(i)", at: 30 + Double(i)) }
+        try expect(tracker.finishIfDue(at: 90.5) != nil, "Long requests should rotate before the one-minute limit")
     }
 
     private static func testWindowsEquivalents() throws {

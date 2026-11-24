@@ -160,6 +160,8 @@ final class CourseModeController: NSObject, NSMenuItemValidation {
         guard let id = currentModeID, let mode = allModes.first(where: { $0.id == id }) else { return }
         var restored = mode
         restored.startBreakTimer = false
+        // Never switch the microphone on by itself at launch.
+        restored.captions = false
         apply(restored, showToast: false)
     }
 

@@ -78,15 +78,31 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         modeCoordinator.onToggleSpotlight = { [weak spotlightController] in
             spotlightController?.toggleSpotlight()
         }
-        modeCoordinator.additionalCaptureExclusions = { [weak keystrokeController, weak spotlightController] in
-            [keystrokeController?.windowNumberForCaptureExclusion, spotlightController?.windowNumberForCaptureExclusion]
-                .compactMap { $0 }
+        let captionController = CaptionController()
+        captionController.onHotkeyChange = { [weak hotkeyService] in
+            hotkeyService?.reloadHotkey()
+        }
+        modeCoordinator.onToggleCaptions = { [weak captionController] in
+            captionController?.toggle()
+        }
+        modeCoordinator.additionalCaptureExclusions = { [weak keystrokeController, weak spotlightController, weak captionController] in
+            [
+                keystrokeController?.windowNumberForCaptureExclusion,
+                spotlightController?.windowNumberForCaptureExclusion,
+                captionController?.windowNumberForCaptureExclusion
+            ].compactMap { $0 }
         }
         modeCoordinator.keystrokeFrameProvider = { [weak keystrokeController] in
             keystrokeController?.recordingFrame()
         }
 
         let courseModeController = CourseModeController(keystrokes: keystrokeController, spotlight: spotlightController)
+        courseModeController.setCaptions = { [weak captionController] on in
+            captionController?.setEnabled(on)
+        }
+        courseModeController.captionsEnabled = { [weak captionController] in
+            captionController?.isRunning ?? false
+        }
         courseModeController.startBreakTimer = { [weak modeCoordinator] in
             guard let modeCoordinator, modeCoordinator.mode != .breakTimer else { return }
             modeCoordinator.handle(.toggleBreakTimer)
@@ -100,12 +116,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             modeCoordinator: modeCoordinator,
             userSelectedResourceAccess: userSelectedResourceAccess,
             keystrokeController: keystrokeController,
-            spotlightController: spotlightController
+            spotlightController: spotlightController,
+            captionController: captionController
         )
 
         statusItem = makeStatusItem(controller: appController!, courseModes: courseModeController)
-        modeCoordinator.onRecordingStateChanged = { [weak self] recording in
+        modeCoordinator.onRecordingStateChanged = { [weak self, weak captionController] recording in
             self?.updateRecordingIndicator(recording)
+            captionController?.recordingStateChanged(recording)
         }
         hotkeyService.start()
         keystrokeController.start()
@@ -188,6 +206,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         courseModes.menuItem = modesItem
         menu.insertItem(modesItem, at: 1)
 
+        if let index = menu.items.firstIndex(where: { $0.action == #selector(AppController.toggleCaptions) }) {
+            let toggleItem = menu.items[index]
+            toggleItem.target = controller.captionController
+            toggleItem.action = #selector(CaptionController.toggle)
+            let optionsItem = NSMenuItem(title: L10n.t("Caption Options", "字幕選項"), action: nil, keyEquivalent: "")
+            optionsItem.submenu = controller.captionController.makeMenu()
+            menu.insertItem(optionsItem, at: index + 1)
+        }
         if let index = menu.items.firstIndex(where: { $0.action == #selector(AppController.toggleSpotlight) }) {
             let toggleItem = menu.items[index]
             toggleItem.target = controller.spotlightController
@@ -235,6 +261,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             StatusMenuEntry(title: "Break Timer", action: #selector(AppController.toggleBreakTimer), keyEquivalent: ""),
             StatusMenuEntry(title: "Show Keystrokes", action: #selector(AppController.toggleKeystrokes), keyEquivalent: ""),
             StatusMenuEntry(title: "Spotlight", action: #selector(AppController.toggleSpotlight), keyEquivalent: ""),
+            StatusMenuEntry(title: "Live Captions", action: #selector(AppController.toggleCaptions), keyEquivalent: ""),
             .separator,
             StatusMenuEntry(title: "Check Permissions", action: #selector(AppController.checkPermissions), keyEquivalent: ""),
             StatusMenuEntry(title: "Quit", action: #selector(AppController.quit), keyEquivalent: "q")

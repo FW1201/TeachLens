@@ -25,6 +25,7 @@ final class HotkeyService {
     private var breakHotKeyRef: EventHotKeyRef?
     private var keystrokeHotKeyRef: EventHotKeyRef?
     private var spotlightHotKeyRef: EventHotKeyRef?
+    private var captionsHotKeyRef: EventHotKeyRef?
     private var zoomInNavRef: EventHotKeyRef?
     private var zoomOutNavRef: EventHotKeyRef?
     private var eventHandlerRef: EventHandlerRef?
@@ -145,6 +146,7 @@ final class HotkeyService {
                 case 18: command = .toggleDemoMirror(scope: .window)
                 case 19: command = .toggleKeystrokes
                 case 20: command = .toggleSpotlight
+                case 21: command = .toggleCaptions
                 default: return noErr
                 }
 
@@ -339,6 +341,19 @@ final class HotkeyService {
             )
         }
 
+        // Live captions toggle (TeachLens addition, default Control+Shift+C).
+        let captionSettings = CaptionSettingsStore().load()
+        if captionSettings.toggleKeyCode != 0 {
+            RegisterEventHotKey(
+                UInt32(captionSettings.toggleKeyCode),
+                carbonModifiers(from: NSEvent.ModifierFlags(rawValue: captionSettings.toggleModifiers)),
+                EventHotKeyID(signature: signature, id: 21),
+                target,
+                0,
+                &captionsHotKeyRef
+            )
+        }
+
         // DemoMirror: the base shortcut mirrors the whole screen; the same
         // shortcut with Shift toggled selects a region to mirror; with Option
         // toggled it mirrors the window under the cursor.
@@ -448,6 +463,10 @@ final class HotkeyService {
             UnregisterEventHotKey(spotlightHotKeyRef)
         }
         spotlightHotKeyRef = nil
+        if let captionsHotKeyRef {
+            UnregisterEventHotKey(captionsHotKeyRef)
+        }
+        captionsHotKeyRef = nil
     }
 
     private func carbonModifiers(from flags: NSEvent.ModifierFlags) -> UInt32 {

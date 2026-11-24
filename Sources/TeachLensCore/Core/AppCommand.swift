@@ -25,6 +25,7 @@ enum AppCommand: Equatable {
     case toggleBreakTimer
     case toggleKeystrokes
     case toggleSpotlight
+    case toggleCaptions
     case toggleDemoMirror(scope: DemoMirrorScope)
     case exit
 }

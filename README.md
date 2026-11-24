@@ -28,6 +28,7 @@ TeachLens as a whole is distributed under the **GNU GPL-3.0** ([LICENSE](LICENSE
 | Panorama to clipboard / file | Control+8 / Control+Shift+8 |
 | Show / hide keystrokes | Control+0 |
 | Spotlight | Control+Shift+0 |
+| Live captions | Control+Shift+C |
 
 All hotkeys are configurable in Settings.
 
@@ -54,6 +55,7 @@ All hotkeys are configurable in Settings.
 - macOS 14 or newer.
 - Xcode command-line tools.
 - Screen Recording permission for capture.
+- Microphone and Speech Recognition permissions for live captions.
 - Input Monitoring permission to show keystrokes (System Settings ▸ Privacy & Security ▸ Input Monitoring).
 - Microphone and Speech Recognition permissions are required only for microphone recording and optional snip dictation; Camera is required only for the webcam option.
 

@@ -44,6 +44,8 @@ enum HotkeyConflicts {
         list.append(Shortcut(name: "Show Keystrokes", keyCode: keystrokes.toggleKeyCode, modifiers: keystrokes.toggleModifiers))
         let spotlight = SpotlightSettingsStore().load()
         list.append(Shortcut(name: "Spotlight", keyCode: spotlight.toggleKeyCode, modifiers: spotlight.toggleModifiers))
+        let captions = CaptionSettingsStore().load()
+        list.append(Shortcut(name: "Live Captions", keyCode: captions.toggleKeyCode, modifiers: captions.toggleModifiers))
         // A key code of 0 disables a shortcut.
         return list.filter { $0.keyCode != 0 }
     }
