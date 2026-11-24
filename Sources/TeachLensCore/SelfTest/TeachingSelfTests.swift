@@ -68,6 +68,8 @@ enum TeachingSelfTests {
         let height = GraphicalToolsLayout.expandedHeight(originY: low.y, in: short)
         try expect(low.y + height <= short.maxY && height >= GraphicalToolsLayout.collapsedHeight,
                    "On a short screen the column should stay on screen and scroll")
+        try expect(ToolbarTool.defaultPinned.count == 6 && Set(ToolbarTool.defaultPinned).count == 6,
+                   "The toolbar should pin six distinct tools by default")
     }
 
     private static func testLanguageSetting() throws {
