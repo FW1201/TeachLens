@@ -34,8 +34,9 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
     private var settings: AppSettings
     private let keystrokeController: KeystrokeController?
     private let spotlightController: SpotlightController?
+    private let teaching: TeachingControllers?
 
-    private static let homepageURLString = "https://github.com/FW1201/keyviz-for-Mac"
+    private static let homepageURLString = "https://github.com/FW1201/TeachLens"
     private static let contentWidth: CGFloat = 540
     private static let panelHorizontalInset: CGFloat = 28
     private static let wrappedLabelWidth: CGFloat = contentWidth - panelHorizontalInset * 2
@@ -128,8 +129,10 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         onOpenTrimEditor: @escaping () -> Void,
         userSelectedResourceAccess: UserSelectedResourceAccess,
         keystrokeController: KeystrokeController? = nil,
-        spotlightController: SpotlightController? = nil
+        spotlightController: SpotlightController? = nil,
+        teaching: TeachingControllers? = nil
     ) {
+        self.teaching = teaching
         self.keystrokeController = keystrokeController
         self.spotlightController = spotlightController
         self.settingsStore = settingsStore
@@ -182,8 +185,12 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
 
     /// The Options dialog tabs, in order. Zoom and Live Zoom are separate tabs
     /// (matching Windows ZoomIt, whose Zoom tab holds static-zoom settings only).
-    static var settingsTabTitles: [String] {
-        var titles = ["General", "Keystrokes", "Spotlight", "Zoom", "Live Zoom", "Draw", "Type"]
+    /// Pane IDs (stable, English) in sidebar order: TeachLens's teaching
+    /// panes first, then the tools inherited from ZoomIt.
+    static let teachingPaneIDs = ["Check", "Keystrokes", "Spotlight", "Captions", "Modes", "Whiteboard"]
+
+    static var toolPaneIDs: [String] {
+        var titles = ["General", "Zoom", "Live Zoom", "Draw", "Type"]
         #if !TEACHLENS_APP_STORE
         titles.append("DemoType")
         #endif
@@ -191,11 +198,49 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         return titles
     }
 
+    static var settingsTabTitles: [String] { teachingPaneIDs + toolPaneIDs }
+
+    /// The localized name shown for a pane ID.
+    static func displayTitle(for id: String) -> String {
+        switch id {
+        case "Check": return L10n.t("Check & Test", "總覽與測試")
+        case "Keystrokes": return L10n.t("Keystrokes", "按鍵顯示")
+        case "Spotlight": return L10n.t("Spotlight", "聚光燈")
+        case "Captions": return L10n.t("Captions", "字幕")
+        case "Modes": return L10n.t("Course Modes", "課程模式")
+        case "Whiteboard": return L10n.t("Whiteboard", "白板")
+        case "General": return L10n.t("General", "一般")
+        case "Zoom": return L10n.t("Zoom", "放大")
+        case "Live Zoom": return L10n.t("Live Zoom", "即時放大")
+        case "Draw": return L10n.t("Draw", "畫筆")
+        case "Type": return L10n.t("Type", "文字")
+        case "Break": return L10n.t("Break", "休息計時")
+        case "Snip": return L10n.t("Snip", "截圖")
+        case "Record": return L10n.t("Record", "錄影")
+        case "Panorama": return L10n.t("Panorama", "長截圖")
+        default: return id
+        }
+    }
+
+    private enum SidebarRow {
+        case header(String)
+        case pane(String)
+    }
+
+    private static var sidebarRows: [SidebarRow] {
+        [.header(L10n.t("Teaching", "教學"))] + teachingPaneIDs.map { .pane($0) }
+            + [.header(L10n.t("ZoomIt Tools", "ZoomIt 工具"))] + toolPaneIDs.map { .pane($0) }
+    }
+
     private func viewForTab(_ title: String) -> NSView {
         switch title {
         case "General": return makeGeneralTab()
         case "Keystrokes": return makeKeystrokesTab()
         case "Spotlight": return makeSpotlightTab()
+        case "Check": return hostTeachingPane { CheckAndTestPane(controllers: $0) }
+        case "Captions": return hostTeachingPane { CaptionSettingsPane(controller: $0.captions) }
+        case "Modes": return hostTeachingPane { CourseModeSettingsPane(controller: $0.courseModes) }
+        case "Whiteboard": return hostTeachingPane { WhiteboardSettingsPane(controller: $0.whiteboard) }
         case "Zoom": return makeZoomTab()
         case "Live Zoom": return makeLiveZoomTab()
         case "Draw": return makeDrawTab()
@@ -210,6 +255,19 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         case "DemoMirror": return makeDemoMirrorTab()
         default: return NSView()
         }
+    }
+
+    private func hostTeachingPane<V: View>(_ make: (TeachingControllers) -> V) -> NSView {
+        guard let teaching else { return NSView() }
+        return NSHostingView(rootView: make(teaching).frame(width: Self.contentWidth, height: 460))
+    }
+
+    /// Rebuilds the window in the newly chosen language.
+    func reloadForLanguageChange() {
+        let wasVisible = window?.isVisible ?? false
+        window?.orderOut(nil)
+        window = nil
+        if wasVisible { show() }
     }
 
     private func makeWindow() -> NSWindow {
@@ -241,7 +299,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         // tabs it no longer fits the window's width. Hide it (keeping the
         // bezel border around the content) and drive selection from a custom
         // two-row button bar built below instead.
-        tabView.tabViewType = .noTabsBezelBorder
+        tabView.tabViewType = .noTabsNoBorder
         for (label, content) in tabs {
             // The holder is frame-managed so NSTabView resizes it to fill the
             // content area; the content is pinned to the holder's top so every
@@ -308,7 +366,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         // list and its footer fit without scrolling.
         container.layoutSubtreeIfNeeded()
         let fitting = container.fittingSize
-        let sidebarNeededHeight = CGFloat(Self.settingsTabTitles.count) * Self.sidebarRowHeight
+        let sidebarNeededHeight = CGFloat(Self.sidebarRows.count) * Self.sidebarRowHeight
             + Self.sidebarFooterAllowance
         window.setContentSize(NSSize(
             width: max(fitting.width + Self.sidebarWidth, 480),
@@ -360,7 +418,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         scrollView.automaticallyAdjustsContentInsets = true
 
         sidebarTableView = tableView
-        tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+        tableView.selectRowIndexes(IndexSet(integer: 1), byExtendingSelection: false)
 
         // The product/copyright/link block sits at the foot of the sidebar.
         let footer = makeFooter(maxWidth: Self.sidebarWidth - 16)
@@ -403,6 +461,10 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         case "General": return "gearshape"
         case "Keystrokes": return "command"
         case "Spotlight": return "light.max"
+        case "Check": return "checklist"
+        case "Captions": return "captions.bubble"
+        case "Modes": return "square.stack"
+        case "Whiteboard": return "scribble"
         case "Zoom": return "plus.magnifyingglass"
         case "Live Zoom": return "magnifyingglass.circle"
         case "Draw": return "pencil.tip"
@@ -420,12 +482,39 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
     // MARK: - Sidebar list
 
     func numberOfRows(in tableView: NSTableView) -> Int {
-        Self.settingsTabTitles.count
+        Self.sidebarRows.count
+    }
+
+    func tableView(_ tableView: NSTableView, isGroupRow row: Int) -> Bool {
+        if case .header = Self.sidebarRows[row] { return true }
+        return false
+    }
+
+    func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
+        if case .pane = Self.sidebarRows[row] { return true }
+        return false
     }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        guard Self.settingsTabTitles.indices.contains(row) else { return nil }
-        let title = Self.settingsTabTitles[row]
+        let rows = Self.sidebarRows
+        guard rows.indices.contains(row) else { return nil }
+        let title: String
+        switch rows[row] {
+        case .header(let text):
+            let label = NSTextField(labelWithString: text)
+            label.font = .systemFont(ofSize: NSFont.smallSystemFontSize, weight: .semibold)
+            label.textColor = .secondaryLabelColor
+            let cell = NSTableCellView()
+            cell.addSubview(label)
+            label.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                label.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 4),
+                label.bottomAnchor.constraint(equalTo: cell.bottomAnchor, constant: -3)
+            ])
+            return cell
+        case .pane(let id):
+            title = id
+        }
 
         let imageView = NSImageView(
             image: NSImage(
@@ -436,7 +525,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         imageView.contentTintColor = .controlAccentColor
         imageView.widthAnchor.constraint(equalToConstant: 18).isActive = true
 
-        let label = NSTextField(labelWithString: title)
+        let label = NSTextField(labelWithString: Self.displayTitle(for: title))
         label.font = .systemFont(ofSize: NSFont.systemFontSize)
         label.lineBreakMode = .byTruncatingTail
 
@@ -461,46 +550,28 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
     func tableViewSelectionDidChange(_ notification: Notification) {
         guard let sidebarTableView, let settingsTabView else { return }
         let row = sidebarTableView.selectedRow
-        guard settingsTabView.tabViewItems.indices.contains(row) else { return }
-        settingsTabView.selectTabViewItem(at: row)
+        guard Self.sidebarRows.indices.contains(row), case .pane(let id) = Self.sidebarRows[row] else { return }
+        settingsTabView.selectTabViewItem(withIdentifier: id)
     }
 
+    /// Two short lines: version + commit, and the fork credit link.
     private func makeFooter(maxWidth: CGFloat) -> NSView {
-        let title = makeLabel("\(AppInfo.productName) \(AppInfo.version)")
-        title.font = NSFont.systemFont(ofSize: 11, weight: .semibold)
+        let title = makeLabel("\(AppInfo.productName) \(AppInfo.version) · \(AppInfo.commit)")
+        title.font = NSFont.systemFont(ofSize: 11, weight: .medium)
         title.textColor = .secondaryLabelColor
         title.alignment = .center
-
-        let copyright = makeLabel(AppInfo.copyright)
-        copyright.font = NSFont.systemFont(ofSize: 11)
-        copyright.textColor = .secondaryLabelColor
-        copyright.alignment = .center
+        title.lineBreakMode = .byTruncatingTail
 
         let forkLink = LinkButton(title: AppInfo.forkCredit, target: self, action: #selector(openForkPage(_:)))
         forkLink.isBordered = false
         forkLink.bezelStyle = .inline
         forkLink.attributedTitle = NSAttributedString(
             string: AppInfo.forkCredit,
-            attributes: [.foregroundColor: NSColor.linkColor, .font: NSFont.systemFont(ofSize: 10)]
+            attributes: [.foregroundColor: NSColor.linkColor, .font: NSFont.systemFont(ofSize: 11)]
         )
         forkLink.toolTip = AppInfo.forkURL
 
-        let attribution = makeLabel(AppInfo.attribution)
-        attribution.font = NSFont.systemFont(ofSize: 10)
-        attribution.textColor = .tertiaryLabelColor
-        attribution.alignment = .center
-
-        // The sidebar is much narrower than the pane area the footer used to
-        // sit under, so let the product and copyright lines wrap to fit it.
-        for label in [title, copyright, attribution] {
-            label.lineBreakMode = .byWordWrapping
-            label.maximumNumberOfLines = 0
-            label.preferredMaxLayoutWidth = maxWidth
-        }
-
-        let link = makeLink(title: "github.com/FW1201/keyviz-for-Mac")
-
-        let stack = NSStackView(views: [title, copyright, attribution, forkLink, link])
+        let stack = NSStackView(views: [title, forkLink])
         stack.orientation = .vertical
         stack.alignment = .centerX
         stack.spacing = 2
@@ -629,19 +700,44 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
 
     private func makeGeneralTab() -> NSView {
         let help = makeLabel(
-            "TeachLens runs in the menu bar. Use the Zoom and Draw tabs to set the keyboard shortcuts that activate it.",
+            L10n.t("TeachLens runs in the menu bar. Choose a pane on the left to set it up.", "TeachLens 常駐在選單列。從左側選擇要設定的功能。"),
             wraps: true
         )
 
-        let launchCheck = NSButton(checkboxWithTitle: "Launch TeachLens when I log in", target: self, action: #selector(toggleLaunchAtLogin(_:)))
+        let launchCheck = NSButton(checkboxWithTitle: L10n.t("Launch TeachLens when I log in", "登入時自動啟動 TeachLens"), target: self, action: #selector(toggleLaunchAtLogin(_:)))
         launchCheck.state = settings.launchAtLogin ? .on : .off
         launchCheck.isEnabled = LaunchAtLogin.isAvailable
         if !LaunchAtLogin.isAvailable {
-            launchCheck.toolTip = "Launch at login requires running TeachLens from TeachLens.app."
+            launchCheck.toolTip = L10n.t("Launch at login requires running TeachLens from TeachLens.app.", "必須從 TeachLens.app 執行才能設定登入時啟動。")
         }
         launchAtLoginCheckbox = launchCheck
 
-        return makeColumn([help, launchCheck])
+        let languagePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+        for language in AppLanguage.allCases {
+            languagePopup.addItem(withTitle: language.title)
+            languagePopup.lastItem?.representedObject = language.rawValue
+        }
+        languagePopup.selectItem(at: AppLanguage.allCases.firstIndex(of: L10n.language) ?? 0)
+        languagePopup.target = self
+        languagePopup.action = #selector(languageChanged(_:))
+        let languageRow = makeRow([makeLabel(L10n.t("Language:", "語言：")), languagePopup])
+
+        let aboutTitle = makeSectionLabel(L10n.t("About", "關於"))
+        let about = makeLabel(
+            "\(AppInfo.productName) \(AppInfo.version) (\(AppInfo.commit))\n\(AppInfo.copyright)\n\(AppInfo.attribution)",
+            wraps: true
+        )
+        about.textColor = .secondaryLabelColor
+        let link = makeLink(title: "github.com/FW1201/TeachLens")
+
+        return makeColumn([help, launchCheck, languageRow, aboutTitle, about, link])
+    }
+
+    @objc private func languageChanged(_ sender: NSPopUpButton) {
+        guard let raw = sender.selectedItem?.representedObject as? String,
+              let language = AppLanguage(rawValue: raw), language != L10n.language else { return }
+        L10n.language = language
+        NotificationCenter.default.post(name: L10n.didChangeNotification, object: nil)
     }
 
     @objc private func toggleLaunchAtLogin(_ sender: NSButton) {
@@ -652,9 +748,9 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
             try LaunchAtLogin.setEnabled(enable)
         } catch {
             let alert = NSAlert()
-            alert.messageText = "Couldn’t update the login item"
-            alert.informativeText = "TeachLens saved your startup preference and will try again next launch. macOS reported: \(error.localizedDescription)"
-            alert.addButton(withTitle: "OK")
+            alert.messageText = L10n.t("Couldn’t update the login item", "無法更新登入項目")
+            alert.informativeText = L10n.t("TeachLens saved your startup preference and will try again next launch. macOS reported: \(error.localizedDescription)", "已保存設定，下次啟動時會再試一次。系統訊息：\(error.localizedDescription)")
+            alert.addButton(withTitle: L10n.t("OK", "好"))
             alert.runModal()
         }
     }
@@ -685,7 +781,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
 
     private func makeZoomTab() -> NSView {
         let help = makeLabel(
-            "After toggling TeachLens you can zoom in and out with the mouse wheel or Option+Up and Option+Down, and pan by moving the mouse. Exit zoom mode with Escape or by pressing the right mouse button.",
+            L10n.t("Zoom with the mouse wheel or Option+↑/↓; exit with Esc or a right-click.", "用滑鼠滾輪或 ⌥↑／⌥↓ 調整倍率；按 Esc 或右鍵離開。"),
             wraps: true
         )
 
@@ -694,9 +790,9 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         hotKeyButton.setButtonType(.momentaryPushIn)
         hotKeyButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 140).isActive = true
         self.hotKeyButton = hotKeyButton
-        let hotKeyRow = makeRow([makeLabel("Zoom Toggle:"), hotKeyButton])
+        let hotKeyRow = makeRow([makeLabel(L10n.t("Zoom Toggle:", "放大快捷鍵：")), hotKeyButton])
 
-        let magHelp = makeLabel("Specify the initial level of magnification when zooming in:", wraps: true)
+        let magHelp = makeLabel(L10n.t("Specify the initial level of magnification when zooming in:", "放大時的初始倍率："), wraps: true)
 
         let magPopup = NSPopUpButton(frame: .zero, pullsDown: false)
         magPopup.translatesAutoresizingMaskIntoConstraints = false
@@ -709,10 +805,10 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         magPopup.selectItem(at: selectedIndex)
         magPopup.target = self
         magPopup.action = #selector(zoomLevelChanged(_:))
-        let magRow = makeRow([makeLabel("Initial magnification:"), magPopup])
+        let magRow = makeRow([makeLabel(L10n.t("Initial magnification:", "初始倍率：")), magPopup])
 
-        let animateCheck = makeCheckbox("Animate zoom in and zoom out:", action: #selector(animateZoomChanged(_:)), state: settings.animateZoom)
-        let smoothCheck = makeCheckbox("Smooth zoomed image:", action: #selector(smoothImageChanged(_:)), state: settings.smoothImage)
+        let animateCheck = makeCheckbox(L10n.t("Animate zoom in and zoom out:", "放大與縮小時顯示動畫："), action: #selector(animateZoomChanged(_:)), state: settings.animateZoom)
+        let smoothCheck = makeCheckbox(L10n.t("Smooth zoomed image:", "平滑放大後的影像："), action: #selector(smoothImageChanged(_:)), state: settings.smoothImage)
 
         return makeColumn([help, hotKeyRow, magHelp, magRow, makeCheckboxColumn([animateCheck, smoothCheck])])
     }
@@ -723,7 +819,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
     /// settings, matching the Windows ZoomIt options dialog.
     private func makeLiveZoomTab() -> NSView {
         let liveHelp = makeLabel(
-            "Live zoom magnifies the live screen so motion and updates stay visible while zoomed. Use the same zoom and pan controls.",
+            L10n.t("Magnifies the live screen so motion stays visible while zoomed.", "放大即時畫面，放大時動態內容仍持續更新。"),
             wraps: true
         )
 
@@ -732,7 +828,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         liveHotKeyButton.setButtonType(.momentaryPushIn)
         liveHotKeyButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 140).isActive = true
         self.liveHotKeyButton = liveHotKeyButton
-        let liveHotKeyRow = makeRow([makeLabel("LiveZoom Toggle:"), liveHotKeyButton])
+        let liveHotKeyRow = makeRow([makeLabel(L10n.t("LiveZoom Toggle:", "即時放大快捷鍵：")), liveHotKeyButton])
 
         return makeColumn([liveHelp, liveHotKeyRow])
     }
@@ -810,7 +906,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         // resume as soon as recording finishes, so shortcuts like the Zoom toggle
         // keep working while the Settings dialog is merely open (issue #22).
         onSuspendHotkeys()
-        sender.title = "Type shortcut… (Esc cancels)"
+        sender.title = L10n.t("Type shortcut… (Esc cancels)", "請按快捷鍵…（Esc 取消）")
         hotKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
             guard let self else { return event }
             return self.captureHotKey(event)
@@ -1066,7 +1162,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
     }
 
     private func snipOcrHotKeyDisplayString() -> String {
-        guard settings.snipOcrHotKeyCode != 0 else { return "None" }
+        guard settings.snipOcrHotKeyCode != 0 else { return L10n.t("None", "無") }
         return Self.describe(keyCode: settings.snipOcrHotKeyCode, modifiers: NSEvent.ModifierFlags(rawValue: settings.snipOcrHotKeyModifiers))
     }
 
@@ -1076,7 +1172,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
 
     #if !TEACHLENS_APP_STORE
     private func demoTypeHotKeyDisplayString() -> String {
-        guard settings.demoTypeHotKeyCode != 0 else { return "None" }
+        guard settings.demoTypeHotKeyCode != 0 else { return L10n.t("None", "無") }
         return Self.describe(keyCode: settings.demoTypeHotKeyCode, modifiers: NSEvent.ModifierFlags(rawValue: settings.demoTypeHotKeyModifiers))
     }
     #endif
@@ -1093,37 +1189,37 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
 
     private func makeDrawTab() -> NSView {
         let help = makeLabel(
-            "Once zoomed, enter drawing mode by pressing the left mouse button; exit drawing mode by pressing the right mouse button. Undo with Command-Z or Ctrl+Z and erase all drawing by pressing E.",
+            L10n.t("Left-click to draw, right-click to stop; ⌘Z undoes, E erases all.", "左鍵開始畫，右鍵結束；⌘Z 復原，E 全部清除。"),
             wraps: true
         )
 
-        let penSection = makeSectionLabel("Pen Control")
+        let penSection = makeSectionLabel(L10n.t("Pen Control", "筆的控制"))
         let penHelp = makeLabel(
-            "Change the pen width with the mouse wheel, the [ and ] keys, or Shift with the up and down arrow keys.",
+            L10n.t("Pen width: mouse wheel, [ and ], or Shift+↑/↓.", "筆寬：滑鼠滾輪、[ ]，或 Shift+↑／↓。"),
             wraps: true
         )
 
-        let colorsSection = makeSectionLabel("Colors")
+        let colorsSection = makeSectionLabel(L10n.t("Colors", "顏色"))
         let colorsHelp = makeLabel(
-            "Change the pen color by pressing R, G, B, O, Y, P, W or K for red, green, blue, orange, yellow, pink, white or black.",
+            L10n.t("R G B O Y P W K: red, green, blue, orange, yellow, pink, white, black.", "R G B O Y P W K：紅、綠、藍、橘、黃、粉、白、黑。"),
             wraps: true
         )
 
-        let highlightSection = makeSectionLabel("Highlight")
+        let highlightSection = makeSectionLabel(L10n.t("Highlight", "螢光筆"))
         let highlightHelp = makeLabel(
-            "Hold Shift with a color key, for example Shift+R, to draw with a translucent highlighter of that color. Press the color key again without Shift to return to a solid pen.",
+            L10n.t("Shift + a colour key draws with a highlighter.", "Shift＋顏色鍵改為螢光筆。"),
             wraps: true
         )
 
-        let shapesSection = makeSectionLabel("Shapes")
+        let shapesSection = makeSectionLabel(L10n.t("Shapes", "圖形"))
         let shapesHelp = makeLabel(
-            "Hold Shift for a line, Control for a rectangle, Tab for an ellipse, or Shift+Control for an arrow while dragging.",
+            L10n.t("Drag with Shift: line · Control: rectangle · Tab: ellipse · Shift+Control: arrow.", "拖曳時按 Shift：直線 · Control：矩形 · Tab：橢圓 · Shift+Control：箭頭。"),
             wraps: true
         )
 
-        let screenSection = makeSectionLabel("Screen")
+        let screenSection = makeSectionLabel(L10n.t("Screen", "畫面"))
         let screenHelp = makeLabel(
-            "Press Ctrl+W or Ctrl+K to blank the screen white or black as a sketch pad.",
+            L10n.t("Ctrl+W / Ctrl+K turns the screen into a white / black board.", "Ctrl+W／Ctrl+K 切換成白板／黑板。"),
             wraps: true
         )
 
@@ -1132,7 +1228,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         drawHotKeyButton.setButtonType(.momentaryPushIn)
         drawHotKeyButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 140).isActive = true
         self.drawHotKeyButton = drawHotKeyButton
-        let drawHotKeyRow = makeRow([makeLabel("Draw w/out Zoom:"), drawHotKeyButton])
+        let drawHotKeyRow = makeRow([makeLabel(L10n.t("Draw w/out Zoom:", "不放大直接畫：")), drawHotKeyButton])
 
         return makeColumn([
             help,
@@ -1154,11 +1250,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
 
     private func makeTypeTab() -> NSView {
         let help = makeLabel(
-            """
-            Once in drawing mode, press T to enter typing mode or Shift+T to enter typing mode with right-aligned input. Exit typing mode by pressing Escape or the left mouse button. Use the mouse wheel or the up and down arrow keys to change the font size.
-
-            The text color is the current drawing color.
-            """,
+            L10n.t("While drawing, press T to type (Shift+T: right-aligned); ↑/↓ change the size.", "畫筆模式下按 T 打字（Shift+T 靠右）；↑／↓ 調整字級。"),
             wraps: true
         )
 
@@ -1166,10 +1258,10 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         fontSampleLabel = sample
         updateFontSample()
 
-        let fontButton = NSButton(title: "Select Font…", target: self, action: #selector(selectFont(_:)))
+        let fontButton = NSButton(title: L10n.t("Select Font…", "選擇字體…"), target: self, action: #selector(selectFont(_:)))
         fontButton.bezelStyle = .rounded
 
-        let fontRow = makeRow([makeLabel("Typing font:"), fontButton])
+        let fontRow = makeRow([makeLabel(L10n.t("Typing font:", "打字字體：")), fontButton])
 
         return makeColumn([help, fontRow, sample])
     }
@@ -1178,7 +1270,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
 
     private func makeBreakTab() -> NSView {
         let help = makeLabel(
-            "Press the break timer shortcut to show a full-screen countdown. Use the arrow keys or mouse wheel to adjust time, color keys to change timer color, and Escape or right-click to exit.",
+            L10n.t("Shows a full-screen countdown; arrow keys adjust the time, Esc exits.", "顯示全螢幕倒數；方向鍵調整時間，Esc 離開。"),
             wraps: true
         )
 
@@ -1200,13 +1292,13 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         updateBreakDurationLabel()
         let durationControls = makeRow([durationStepper, durationLabel])
 
-        let expiredCheck = makeCheckbox("Show Time Elapsed After Expiration:", action: #selector(breakShowExpiredChanged(_:)), state: settings.breakShowExpiredTime)
+        let expiredCheck = makeCheckbox(L10n.t("Show Time Elapsed After Expiration:", "時間到後顯示已超過的時間："), action: #selector(breakShowExpiredChanged(_:)), state: settings.breakShowExpiredTime)
 
         let textColorPopup = makeColorPopup(selected: settings.breakTextColorRGB, action: #selector(breakTextColorChanged(_:)))
         let backgroundColorPopup = makeColorPopup(selected: settings.breakBackgroundColorRGB, action: #selector(breakBackgroundColorChanged(_:)))
 
         let positionPopup = makeIndexedPopup(
-            titles: ["Top-left", "Top", "Top-right", "Left", "Center", "Right", "Bottom-left", "Bottom", "Bottom-right"],
+            titles: [L10n.t("Top-left", "左上"), L10n.t("Top", "上"), L10n.t("Top-right", "右上"), L10n.t("Left", "左"), L10n.t("Center", "中央"), L10n.t("Right", "右"), L10n.t("Bottom-left", "左下"), L10n.t("Bottom", "下"), L10n.t("Bottom-right", "右下")],
             selected: settings.breakTimerPosition,
             action: #selector(breakPositionChanged(_:))
         )
@@ -1221,14 +1313,14 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         opacityPopup.target = self
         opacityPopup.action = #selector(breakOpacityChanged(_:))
 
-        let soundCheck = makeCheckbox("Play Sound on Expiration:", action: #selector(breakPlaySoundChanged(_:)), state: settings.breakPlaySound)
+        let soundCheck = makeCheckbox(L10n.t("Play Sound on Expiration:", "時間到時播放聲音："), action: #selector(breakPlaySoundChanged(_:)), state: settings.breakPlaySound)
         let soundField = makePathField(settings.breakSoundFile)
         breakSoundFileField = soundField
-        let soundBrowse = NSButton(title: "Browse…", target: self, action: #selector(chooseBreakSoundFile(_:)))
+        let soundBrowse = NSButton(title: L10n.t("Browse…", "瀏覽…"), target: self, action: #selector(chooseBreakSoundFile(_:)))
         soundBrowse.bezelStyle = .rounded
 
         let backgroundModePopup = makeIndexedPopup(
-            titles: ["No image", "Faded desktop", "Image file"],
+            titles: [L10n.t("No image", "無圖片"), L10n.t("Faded desktop", "淡化桌面"), L10n.t("Image file", "圖片檔")],
             selected: settings.breakBackgroundMode,
             action: #selector(breakBackgroundModeChanged(_:))
         )
@@ -1236,22 +1328,22 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         backgroundModePopup.widthAnchor.constraint(equalToConstant: 150).isActive = true
         let backgroundField = makePathField(settings.breakBackgroundFile)
         breakBackgroundFileField = backgroundField
-        let backgroundBrowse = NSButton(title: "Browse…", target: self, action: #selector(chooseBreakBackgroundFile(_:)))
+        let backgroundBrowse = NSButton(title: L10n.t("Browse…", "瀏覽…"), target: self, action: #selector(chooseBreakBackgroundFile(_:)))
         backgroundBrowse.bezelStyle = .rounded
         breakBackgroundBrowseButton = backgroundBrowse
-        let stretchCheck = makeCheckbox("Scale to screen:", action: #selector(breakBackgroundStretchChanged(_:)), state: settings.breakBackgroundStretch)
+        let stretchCheck = makeCheckbox(L10n.t("Scale to screen:", "縮放至螢幕大小："), action: #selector(breakBackgroundStretchChanged(_:)), state: settings.breakBackgroundStretch)
         breakBackgroundStretchCheckbox = stretchCheck
 
         // A single grid keeps every label/control pair in aligned columns:
         // column 0 = right-aligned labels, column 1 = primary control,
         // column 2 = secondary label, column 3 = secondary control.
         let grid = makeFormGrid([
-            [makeLabel("Start Timer:"), hotKeyButton, makeLabel("Duration:"), durationControls],
-            [makeLabel("Timer color:"), textColorPopup, makeLabel("Background:"), backgroundColorPopup],
-            [makeLabel("Position:"), positionPopup, makeLabel("Opacity:"), opacityPopup],
-            [makeLabel("Backdrop:"), backgroundModePopup, stretchCheck],
-            [makeLabel("Image file:"), backgroundField, backgroundBrowse],
-            [makeLabel("Sound:"), soundField, soundBrowse]
+            [makeLabel(L10n.t("Start Timer:", "開始計時：")), hotKeyButton, makeLabel(L10n.t("Duration:", "時間長度：")), durationControls],
+            [makeLabel(L10n.t("Timer color:", "計時器顏色：")), textColorPopup, makeLabel(L10n.t("Background:", "背景：")), backgroundColorPopup],
+            [makeLabel(L10n.t("Position:", "位置：")), positionPopup, makeLabel(L10n.t("Opacity:", "不透明度：")), opacityPopup],
+            [makeLabel(L10n.t("Backdrop:", "背景樣式：")), backgroundModePopup, stretchCheck],
+            [makeLabel(L10n.t("Image file:", "圖片檔：")), backgroundField, backgroundBrowse],
+            [makeLabel(L10n.t("Sound:", "聲音：")), soundField, soundBrowse]
         ])
 
         updateBreakBackgroundControlsEnabled()
@@ -1263,11 +1355,11 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
     }
 
     private func updateBreakDurationLabel() {
-        breakDurationLabel?.stringValue = "\(settings.breakDurationMinutes) minutes"
+        breakDurationLabel?.stringValue = L10n.t("\(settings.breakDurationMinutes) minutes", "\(settings.breakDurationMinutes) 分鐘")
     }
 
     private func makePathField(_ path: String) -> NSTextField {
-        let field = NSTextField(labelWithString: path.isEmpty ? "No file selected" : path)
+        let field = NSTextField(labelWithString: path.isEmpty ? L10n.t("No file selected", "尚未選擇檔案") : path)
         field.translatesAutoresizingMaskIntoConstraints = false
         field.lineBreakMode = .byTruncatingMiddle
         field.widthAnchor.constraint(equalToConstant: 220).isActive = true
@@ -1336,7 +1428,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.allowedContentTypes = [.audio]
-        panel.title = "TeachLens: Specify Sound File"
+        panel.title = L10n.t("TeachLens: Specify Sound File", "TeachLens：選擇聲音檔")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         guard saveSelection(url, for: .breakSound) else { return }
         settings.breakSoundFile = url.path
@@ -1355,7 +1447,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.allowedContentTypes = [.image]
-        panel.title = "TeachLens: Specify Background File"
+        panel.title = L10n.t("TeachLens: Specify Background File", "TeachLens：選擇背景圖片")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         guard saveSelection(url, for: .breakBackground) else { return }
         settings.breakBackgroundFile = url.path
@@ -1369,31 +1461,21 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
     }
 
     private static let breakColorOptions: [(name: String, rgb: UInt32)] = [
-        ("Red", 0xFF0000),
-        ("Green", 0x00FF00),
-        ("Blue", 0x0000FF),
-        ("Orange", 0xFFA500),
-        ("Yellow", 0xFFFF00),
-        ("Pink", 0xFF69B4),
-        ("White", 0xFFFFFF),
-        ("Black", 0x000000)
+        (L10n.t("Red", "紅"), 0xFF0000),
+        (L10n.t("Green", "綠"), 0x00FF00),
+        (L10n.t("Blue", "藍"), 0x0000FF),
+        (L10n.t("Orange", "橘"), 0xFFA500),
+        (L10n.t("Yellow", "黃"), 0xFFFF00),
+        (L10n.t("Pink", "粉紅"), 0xFF69B4),
+        (L10n.t("White", "白"), 0xFFFFFF),
+        (L10n.t("Black", "黑"), 0x000000)
     ]
 
     // MARK: - Snip tab
 
     private func makeSnipTab() -> NSView {
         let help = makeLabel(
-            """
-            While zoomed, press Command+S to save the entire viewport to a file or Command+C to copy it to the clipboard.
-
-            To capture part of the screen at any time, press the snip shortcut and drag a rectangle. Releasing the drag copies the selected region to the clipboard. Hold Shift with the shortcut to save the region to a file instead. Press Escape to cancel.
-
-            When snip dictation is enabled, press Space once while actively dragging a clipboard snip to record speech. Recording continues through mouse-up while TeachLens transcribes; press Escape to cancel without replacing the clipboard.
-
-            The OCR shortcut works the same way, but recognizes the text in the selected region and copies that text to the clipboard.
-
-            Saved images are PNG files named with the current date and time.
-            """,
+            L10n.t("Drag a region to copy it; hold Shift to save a PNG. The OCR shortcut copies the text instead.", "拖曳範圍即複製；加 Shift 存成 PNG。文字辨識快捷鍵會改為複製文字。"),
             wraps: true
         )
 
@@ -1402,34 +1484,34 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         snipHotKeyButton.setButtonType(.momentaryPushIn)
         snipHotKeyButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 140).isActive = true
         self.snipHotKeyButton = snipHotKeyButton
-        let snipHotKeyRow = makeRow([makeLabel("Snip Toggle:"), snipHotKeyButton])
+        let snipHotKeyRow = makeRow([makeLabel(L10n.t("Snip Toggle:", "截圖快捷鍵：")), snipHotKeyButton])
 
         let snipOcrHotKeyButton = NSButton(title: snipOcrHotKeyDisplayString(), target: self, action: #selector(toggleSnipOcrHotKeyRecording(_:)))
         snipOcrHotKeyButton.bezelStyle = .rounded
         snipOcrHotKeyButton.setButtonType(.momentaryPushIn)
         snipOcrHotKeyButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 140).isActive = true
         self.snipOcrHotKeyButton = snipOcrHotKeyButton
-        let snipOcrHotKeyRow = makeRow([makeLabel("Text Toggle:"), snipOcrHotKeyButton])
+        let snipOcrHotKeyRow = makeRow([makeLabel(L10n.t("Text Toggle:", "文字辨識快捷鍵：")), snipOcrHotKeyButton])
 
         let dictationCheck = makeCheckbox(
-            "Enable dictation during clipboard snips:",
+            L10n.t("Enable dictation during clipboard snips:", "截圖到剪貼簿時可以口述："),
             action: #selector(snipDictationChanged(_:)),
             state: settings.snipDictationEnabled
         )
         let dictationMicrophonePopup = makeMicrophonePopup(enabled: settings.snipDictationEnabled)
         snipMicrophonePopup = dictationMicrophonePopup
         let dictationMicrophoneRow = makeIndentedColumn([
-            makeRow([makeLabel("Dictation microphone:"), dictationMicrophonePopup])
+            makeRow([makeLabel(L10n.t("Dictation microphone:", "口述用麥克風：")), dictationMicrophonePopup])
         ])
 
         let copyOnSaveCheck = makeCheckbox(
-            "Also copy to clipboard when saving to a file:",
+            L10n.t("Also copy to clipboard when saving to a file:", "存檔時也複製到剪貼簿："),
             action: #selector(copySnipToClipboardOnSaveChanged(_:)),
             state: settings.copySnipToClipboardOnSave
         )
 
         let saveToDirectoryCheck = makeCheckbox(
-            "Save to a folder instead of asking each time:",
+            L10n.t("Save to a folder instead of asking each time:", "直接存到資料夾，不每次詢問："),
             action: #selector(saveSnipToDirectoryChanged(_:)),
             state: settings.saveSnipToDirectory
         )
@@ -1439,10 +1521,10 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         directoryField.lineBreakMode = .byTruncatingMiddle
         directoryField.widthAnchor.constraint(equalToConstant: 380).isActive = true
         snipSaveDirectoryField = directoryField
-        let directoryBrowse = NSButton(title: "Browse…", target: self, action: #selector(chooseSnipSaveDirectory(_:)))
+        let directoryBrowse = NSButton(title: L10n.t("Browse…", "瀏覽…"), target: self, action: #selector(chooseSnipSaveDirectory(_:)))
         directoryBrowse.bezelStyle = .rounded
         snipSaveDirectoryBrowseButton = directoryBrowse
-        let directoryRow = makeIndentedColumn([makeRow([makeLabel("Folder:"), directoryField, directoryBrowse])])
+        let directoryRow = makeIndentedColumn([makeRow([makeLabel(L10n.t("Folder:", "資料夾：")), directoryField, directoryBrowse])])
 
         updateSnipSaveDirectoryControlsEnabled()
 
@@ -1495,8 +1577,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
-        panel.prompt = "Choose"
-        panel.title = "TeachLens: Choose Snip Folder"
+        panel.prompt = L10n.t("Choose", "選擇")
+        panel.title = L10n.t("TeachLens: Choose Snip Folder", "TeachLens：選擇截圖資料夾")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         guard saveSelection(url, for: .snipDirectory) else { return }
         settings.snipSaveDirectory = url.path
@@ -1508,11 +1590,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
 
     private func makeRecordTab() -> NSView {
         let help = makeLabel(
-            """
-            Press the record shortcut to record the whole screen to an MP4 file; hold Shift with the shortcut to drag a rectangle and record just that region. Press the shortcut again to stop, then choose where to save the recording.
-
-            Enable system audio to capture what you hear, and choose a microphone to also record your voice. Microphone recording requires the bundled app and microphone permission.
-            """,
+            L10n.t("Records the screen to MP4; hold Shift to record a region. Press again to stop.", "錄製全螢幕為 MP4；加 Shift 錄製區域。再按一次停止。"),
             wraps: true
         )
 
@@ -1521,24 +1599,24 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         recordHotKeyButton.setButtonType(.momentaryPushIn)
         recordHotKeyButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 140).isActive = true
         self.recordHotKeyButton = recordHotKeyButton
-        let recordHotKeyRow = makeRow([makeLabel("Record Toggle:"), recordHotKeyButton])
+        let recordHotKeyRow = makeRow([makeLabel(L10n.t("Record Toggle:", "錄影快捷鍵：")), recordHotKeyButton])
 
-        let systemAudioCheck = makeCheckbox("Capture system audio:", action: #selector(recordSystemAudioChanged(_:)), state: settings.recordSystemAudio)
+        let systemAudioCheck = makeCheckbox(L10n.t("Capture system audio:", "錄製系統聲音："), action: #selector(recordSystemAudioChanged(_:)), state: settings.recordSystemAudio)
 
-        let micCheck = makeCheckbox("Capture audio input:", action: #selector(recordMicrophoneChanged(_:)), state: settings.recordMicrophone)
+        let micCheck = makeCheckbox(L10n.t("Capture audio input:", "錄製麥克風："), action: #selector(recordMicrophoneChanged(_:)), state: settings.recordMicrophone)
 
-        let windNoiseCheck = makeCheckbox("Noise cancellation:", action: #selector(recordNoiseCancellationChanged(_:)), state: settings.recordNoiseCancellation)
+        let windNoiseCheck = makeCheckbox(L10n.t("Noise cancellation:", "降噪："), action: #selector(recordNoiseCancellationChanged(_:)), state: settings.recordNoiseCancellation)
         noiseCancellationCheckbox = windNoiseCheck
 
         let micPopup = makeMicrophonePopup(enabled: settings.recordMicrophone)
         recordMicrophonePopup = micPopup
-        let micDeviceRow = makeRow([makeLabel("Microphone:"), micPopup])
+        let micDeviceRow = makeRow([makeLabel(L10n.t("Microphone:", "麥克風：")), micPopup])
         let micOptions = makeIndentedColumn([windNoiseCheck, micDeviceRow])
         updateMicrophoneOptionControls()
 
-        let trimButton = NSButton(title: "Trim…", target: self, action: #selector(openTrimEditor(_:)))
+        let trimButton = NSButton(title: L10n.t("Trim…", "剪輯…"), target: self, action: #selector(openTrimEditor(_:)))
         trimButton.bezelStyle = .rounded
-        let trimRow = makeRow([makeLabel("Edit existing video:"), trimButton])
+        let trimRow = makeRow([makeLabel(L10n.t("Edit existing video:", "剪輯現有影片：")), trimButton])
 
         return makeColumn([help, recordHotKeyRow, makeCheckboxColumn([systemAudioCheck, micCheck]), micOptions] + makeWebcamRows() + [trimRow], spacing: 10)
     }
@@ -1547,13 +1625,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
 
     private func makePanoramaTab() -> NSView {
         let help = makeLabel(
-            """
-            Press the panorama shortcut and drag a rectangle over scrollable content (for example a long web page or document). TeachLens then captures the region repeatedly while you scroll.
-
-            Scroll smoothly in one direction — vertically or horizontally — and press the shortcut again to finish. The captured frames are aligned and stitched into a single tall (or wide) image.
-
-            The base shortcut copies the stitched panorama to the clipboard; hold Shift with the shortcut to save it to a PNG file instead.
-            """,
+            L10n.t("Drag over scrollable content, scroll, then press again to stitch one long image.", "框選可捲動的內容並捲動，再按一次即拼接成長圖。"),
             wraps: true
         )
 
@@ -1562,7 +1634,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         panoramaHotKeyButton.setButtonType(.momentaryPushIn)
         panoramaHotKeyButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 140).isActive = true
         self.panoramaHotKeyButton = panoramaHotKeyButton
-        let panoramaHotKeyRow = makeRow([makeLabel("Panorama Toggle:"), panoramaHotKeyButton])
+        let panoramaHotKeyRow = makeRow([makeLabel(L10n.t("Panorama Toggle:", "長截圖快捷鍵：")), panoramaHotKeyButton])
 
         return makeColumn([help, panoramaHotKeyRow])
     }
@@ -1571,12 +1643,12 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
 
     private func makeDemoMirrorTab() -> NSView {
         let help = makeLabel(
-            "DemoMirror mirrors the screen, a region of the screen, or a window, including the mouse pointer, onto a second monitor. Use it to show a demo app on the presentation monitor, on top of the slide show, without leaving the presentation.",
+            L10n.t("Mirrors the screen, a region or a window onto a second display.", "把螢幕、區域或視窗鏡像到第二台顯示器。"),
             wraps: true
         )
 
         let shortcutHelp = makeLabel(
-            "Enter the hotkey to mirror the entire screen, enter it with the Shift key to select a region to mirror, or with the Option key to mirror the window under the cursor. Enter the hotkey again to stop mirroring.",
+            L10n.t("Shortcut: whole screen · with Shift: region · with Option: window under the pointer.", "快捷鍵：整個螢幕 · 加 Shift：區域 · 加 Option：游標下的視窗。"),
             wraps: true
         )
 
@@ -1585,13 +1657,13 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         demoMirrorHotKeyButton.setButtonType(.momentaryPushIn)
         demoMirrorHotKeyButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 140).isActive = true
         self.demoMirrorHotKeyButton = demoMirrorHotKeyButton
-        let demoMirrorHotKeyRow = makeRow([makeLabel("Mirror Toggle:"), demoMirrorHotKeyButton])
+        let demoMirrorHotKeyRow = makeRow([makeLabel(L10n.t("Mirror Toggle:", "鏡像快捷鍵：")), demoMirrorHotKeyButton])
 
         let trackWindowHelp = makeLabel(
-            "When mirroring a window, DemoMirror can track the window's screen region so TeachLens zoom and draw show in place. Uncheck to mirror the window's surface directly, unaffected by overlapping windows.",
+            L10n.t("Track the window region so zoom and drawing appear in place.", "追蹤視窗區域，讓放大與畫筆顯示在原位置。"),
             wraps: true
         )
-        let trackWindowCheck = makeCheckbox("Track window region:", action: #selector(demoMirrorTrackWindowChanged(_:)), state: settings.demoMirrorTrackWindowRegion)
+        let trackWindowCheck = makeCheckbox(L10n.t("Track window region:", "追蹤視窗區域："), action: #selector(demoMirrorTrackWindowChanged(_:)), state: settings.demoMirrorTrackWindowRegion)
         demoMirrorTrackWindowCheckbox = trackWindowCheck
 
         return makeColumn([help, shortcutHelp, demoMirrorHotKeyRow, trackWindowHelp, trackWindowCheck])
@@ -1633,12 +1705,12 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         recordMicrophonePopup?.isEnabled = settings.recordMicrophone
         snipMicrophonePopup?.isEnabled = settings.snipDictationEnabled
         let supported = settings.recordMicrophone && AudioDevices.supportsWindNoiseRemoval(deviceID: settings.microphoneDeviceID)
-        noiseCancellationCheckbox?.title = supported ? "Noise cancellation:" : "Noise cancellation (not supported by selected microphone):"
+        noiseCancellationCheckbox?.title = supported ? L10n.t("Noise cancellation:", "降噪：") : L10n.t("Noise cancellation (not supported by selected microphone):", "降噪（所選麥克風不支援）：")
         noiseCancellationCheckbox?.isEnabled = supported
         noiseCancellationCheckbox?.state = (settings.recordNoiseCancellation && supported) ? .on : .off
         noiseCancellationCheckbox?.toolTip = supported
-            ? "Uses AVFoundation wind noise removal for the selected microphone."
-            : "Wind noise removal requires macOS 15 and a microphone that supports it."
+            ? L10n.t("Uses AVFoundation wind noise removal for the selected microphone.", "對所選麥克風使用系統的風噪消除。")
+            : L10n.t("Wind noise removal requires macOS 15 and a microphone that supports it.", "風噪消除需要 macOS 15 以上與支援的麥克風。")
     }
 
     private func makeMicrophonePopup(enabled: Bool) -> NSPopUpButton {
@@ -1680,7 +1752,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
     // MARK: - Webcam controls
 
     private func makeWebcamRows() -> [NSView] {
-        let heading = makeLabel("Webcam overlay:")
+        let heading = makeLabel(L10n.t("Webcam overlay:", "相機子母畫面："))
         heading.font = NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .semibold)
 
         let enableCheck = makeCheckbox("", action: #selector(webcamEnabledChanged(_:)), state: settings.webcamEnabled)
@@ -1701,11 +1773,11 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         let positionPopup = NSPopUpButton(frame: .zero, pullsDown: false)
         positionPopup.translatesAutoresizingMaskIntoConstraints = false
         for item in [
-            ("Top-left", 0),
-            ("Top-right", 1),
-            ("Center", 4),
-            ("Bottom-left", 2),
-            ("Bottom-right", 3)
+            (L10n.t("Top-left", "左上"), 0),
+            (L10n.t("Top-right", "右上"), 1),
+            (L10n.t("Center", "中央"), 4),
+            (L10n.t("Bottom-left", "左下"), 2),
+            (L10n.t("Bottom-right", "右下"), 3)
         ] {
             positionPopup.addItem(withTitle: item.0)
             positionPopup.lastItem?.representedObject = item.1
@@ -1718,14 +1790,14 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         webcamPositionPopup = positionPopup
 
         let sizePopup = makeIndexedPopup(
-            titles: ["Small", "Medium", "Large", "X-Large", "Full screen"],
+            titles: [L10n.t("Small", "小"), L10n.t("Medium", "中"), L10n.t("Large", "大"), L10n.t("X-Large", "特大"), L10n.t("Full screen", "全螢幕")],
             selected: settings.webcamSize,
             action: #selector(webcamSizeChanged(_:))
         )
         webcamSizePopup = sizePopup
 
         let shapePopup = makeIndexedPopup(
-            titles: ["Rectangle", "Rounded rectangle", "Rounded square", "Circle"],
+            titles: [L10n.t("Rectangle", "矩形"), L10n.t("Rounded rectangle", "圓角矩形"), L10n.t("Rounded square", "圓角正方形"), L10n.t("Circle", "圓形")],
             selected: settings.webcamShape,
             action: #selector(webcamShapeChanged(_:))
         )
@@ -1740,8 +1812,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         // A grid keeps the two placement/appearance columns aligned so the
         // Position and Shape labels (and their popups) line up vertically.
         let webcamGrid = makeFormGrid([
-            [makeLabel("Camera:"), devicePopup, makeLabel("Position:"), positionPopup],
-            [makeLabel("Size:"), sizePopup, makeLabel("Shape:"), shapePopup]
+            [makeLabel(L10n.t("Camera:", "相機：")), devicePopup, makeLabel(L10n.t("Position:", "位置：")), positionPopup],
+            [makeLabel(L10n.t("Size:", "大小：")), sizePopup, makeLabel(L10n.t("Shape:", "形狀：")), shapePopup]
         ])
 
         updateWebcamControlsEnabled()
@@ -1809,7 +1881,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         // Render the sample in the actually-selected font so choosing a new font
         // is reflected immediately (it previously always used the system font).
         fontSampleLabel?.font = font
-        fontSampleLabel?.stringValue = "Sample — \(font.displayName ?? font.fontName) \(Int(settings.typingFontSize))pt"
+        fontSampleLabel?.stringValue = L10n.t("Sample — \(font.displayName ?? font.fontName) \(Int(settings.typingFontSize))pt", "範例 — \(font.displayName ?? font.fontName) \(Int(settings.typingFontSize))pt")
     }
 
     /// Font used for the Type tab's live "Sample" preview. Uses the selected
@@ -1843,20 +1915,12 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
 
     private func makeDemoTypeTab() -> NSView {
         let help = makeLabel(
-            "DemoType has TeachLens type text specified in the input file when you enter the DemoType toggle. Simply separate snippets with the [end] keyword.",
+            L10n.t("Types the snippets from a text file; separate snippets with [end].", "依序輸入文字檔中的片段；片段之間用 [end] 分隔。"),
             wraps: true
         )
 
         let controlsHelp = makeLabel(
-            """
-            - Insert pauses with the [pause:n] keyword where 'n' is seconds.
-            - Send text via the clipboard with [paste] and [/paste].
-            - Send keystrokes with [enter], [up], [down], [left], and [right].
-
-            You can have TeachLens send text automatically, or select the option to drive input with typing. When driving input, your key releases advance the script. Press Escape to stop.
-
-            When you reach the end of the file, TeachLens reloads the file and starts at the beginning. Enter the hotkey with Shift toggled to step back to the last [end].
-            """,
+            L10n.t("Keywords: [pause:n] · [paste]…[/paste] · [enter] [up] [down] [left] [right]. Esc stops.", "關鍵字：[pause:n] · [paste]…[/paste] · [enter] [up] [down] [left] [right]。Esc 停止。"),
             wraps: true
         )
 
@@ -1865,20 +1929,20 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         demoTypeHotKeyButton.setButtonType(.momentaryPushIn)
         demoTypeHotKeyButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 140).isActive = true
         self.demoTypeHotKeyButton = demoTypeHotKeyButton
-        let hotKeyRow = makeRow([makeLabel("DemoType toggle:"), demoTypeHotKeyButton])
+        let hotKeyRow = makeRow([makeLabel(L10n.t("DemoType toggle:", "DemoType 快捷鍵：")), demoTypeHotKeyButton])
 
         let fileField = makePathField(settings.demoTypeFile)
         demoTypeFileField = fileField
         let browseButton = NSButton(title: "...", target: self, action: #selector(chooseDemoTypeFile(_:)))
         browseButton.bezelStyle = .rounded
-        let fileRow = makeRow([makeLabel("Input file:"), fileField, browseButton])
+        let fileRow = makeRow([makeLabel(L10n.t("Input file:", "輸入檔案：")), fileField, browseButton])
 
         let speedSlider = NSSlider(value: Double(min(max(settings.demoTypeSpeed, 10), 100)), minValue: 10, maxValue: 100, target: self, action: #selector(demoTypeSpeedChanged(_:)))
         speedSlider.translatesAutoresizingMaskIntoConstraints = false
         speedSlider.widthAnchor.constraint(equalToConstant: 240).isActive = true
-        let speedRow = makeRow([makeLabel("DemoType typing speed:"), makeLabel("Slow"), speedSlider, makeLabel("Fast")])
+        let speedRow = makeRow([makeLabel(L10n.t("DemoType typing speed:", "DemoType 打字速度：")), makeLabel(L10n.t("Slow", "慢")), speedSlider, makeLabel(L10n.t("Fast", "快"))])
 
-        let userDrivenCheck = makeCheckbox("Drive input with typing:", action: #selector(demoTypeUserDrivenChanged(_:)), state: settings.demoTypeUserDriven)
+        let userDrivenCheck = makeCheckbox(L10n.t("Drive input with typing:", "由我打字推進："), action: #selector(demoTypeUserDrivenChanged(_:)), state: settings.demoTypeUserDriven)
 
         return makeColumn([help, controlsHelp, hotKeyRow, fileRow, speedRow, userDrivenCheck], spacing: 8)
     }
@@ -1887,7 +1951,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        panel.title = "TeachLens: Specify DemoType File"
+        panel.title = L10n.t("TeachLens: Specify DemoType File", "TeachLens：選擇 DemoType 檔案")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         settings.demoTypeFile = url.path
         demoTypeFileField?.stringValue = url.path

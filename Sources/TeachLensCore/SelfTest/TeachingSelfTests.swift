@@ -14,6 +14,67 @@ enum TeachingSelfTests {
         try testCaptionSentenceTracker()
         try testWhiteboardPagesAndEraser()
         try testWhiteboardExportAndStore()
+        try testLanguageSetting()
+        try testSettingsPaneTitles()
+        try testKeystrokeDemoSequence()
+        try testBuildCommitFallback()
+        try testShortcutDescriptions()
+    }
+
+    private static func testLanguageSetting() throws {
+        let suite = "TeachLensSelfTest.Language.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suite) else { throw SelfTestError.failure("defaults") }
+        let previousDefaults = L10n.defaults, previousForced = L10n.forcedLanguage
+        defer {
+            L10n.defaults = previousDefaults
+            L10n.forcedLanguage = previousForced
+            defaults.removePersistentDomain(forName: suite)
+        }
+        L10n.defaults = defaults
+        L10n.forcedLanguage = nil
+        try expect(L10n.language == .system, "Language should default to the system language")
+        L10n.language = .zhHant
+        try expect(L10n.isChinese && L10n.t("Zoom", "放大") == "放大", "Traditional Chinese should be used when chosen")
+        L10n.language = .en
+        try expect(!L10n.isChinese && L10n.t("Zoom", "放大") == "Zoom", "English should be used when chosen")
+        try expect(L10n.language == .en, "The choice should persist")
+    }
+
+    private static func testSettingsPaneTitles() throws {
+        let previous = L10n.forcedLanguage
+        defer { L10n.forcedLanguage = previous }
+        let ids = SettingsWindowController.settingsTabTitles
+        try expect(ids.first == "Check", "Check & Test should be the first pane")
+        for id in ["Captions", "Modes", "Whiteboard"] {
+            try expect(ids.contains(id), "Expected a \(id) pane")
+        }
+        L10n.forcedLanguage = "zh-Hant"
+        for id in ids where id != "DemoType" && id != "DemoMirror" {
+            let title = SettingsWindowController.displayTitle(for: id)
+            try expect(title != id, "Pane \(id) should have a Chinese title")
+        }
+        L10n.forcedLanguage = "en"
+        try expect(SettingsWindowController.displayTitle(for: "Check") == "Check & Test", "English title for Check")
+        try expect(Set(ids).count == ids.count, "Pane ids must be unique")
+    }
+
+    private static func testKeystrokeDemoSequence() throws {
+        let groups = KeystrokeController.demoGroups()
+        let rendered = groups.map { $0.modifierGlyphs + $0.chips.map(\.text).joined() + ($0.count > 1 ? "×\($0.count)" : "") }
+        try expect(rendered == ["⌘C", "⇧⌘4", "⌘Z×3"], "Demo should show ⌘C, ⇧⌘4, ⌘Z ×3, got \(rendered)")
+    }
+
+    private static func testBuildCommitFallback() throws {
+        try expect(AppInfo.resolveCommit(from: nil) == "unknown", "Missing commit should read unknown")
+        try expect(AppInfo.resolveCommit(from: ["TeachLensCommit": "abc1234"]) == "abc1234", "Commit should be read from Info.plist")
+    }
+
+    private static func testShortcutDescriptions() throws {
+        let previous = L10n.forcedLanguage
+        L10n.forcedLanguage = "zh-Hant"
+        defer { L10n.forcedLanguage = previous }
+        try expect(TestCenter.describe(.toggleWhiteboard) == "白板", "Shortcut names should be localized")
+        try expect(TestCenter.describe(.toggleKeystrokes) == "顯示按鍵", "Shortcut names should be localized")
     }
 
     private static func testWhiteboardPagesAndEraser() throws {

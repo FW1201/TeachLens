@@ -62,6 +62,7 @@ struct SpotlightSettingsPane: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
         .onAppear {
             if !didLoad {
                 draft = controller.settings

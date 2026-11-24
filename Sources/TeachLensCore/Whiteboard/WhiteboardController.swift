@@ -256,6 +256,8 @@ final class WhiteboardController: NSObject, NSWindowDelegate {
     }
 
     var isVisible: Bool { window?.isVisible ?? false }
+    var pageCount: Int { model.document.pages.count }
+    var saveLocation: URL { store.url }
 
     @objc func toggle() {
         if let window, window.isVisible {
@@ -335,21 +337,31 @@ final class WhiteboardController: NSObject, NSWindowDelegate {
         }
     }
 
-    private func exportPDF() {
+    func exportPDF() {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.pdf]
         panel.nameFieldStringValue = L10n.t("TeachLens Whiteboard.pdf", "TeachLens 白板.pdf")
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        try? WhiteboardRenderer.pdfData(model.document).write(to: url)
+        do {
+            try WhiteboardRenderer.pdfData(model.document).write(to: url)
+            ExportFeedback.saved(url)
+        } catch {
+            ExportFeedback.failed(error)
+        }
     }
 
-    private func exportPNG() {
+    func exportPNG() {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.png]
         panel.nameFieldStringValue = L10n.t("TeachLens Whiteboard Page \(model.document.currentIndex + 1).png",
                                             "TeachLens 白板 第\(model.document.currentIndex + 1)頁.png")
         guard panel.runModal() == .OK, let url = panel.url,
               let data = WhiteboardRenderer.pngData(model.document.currentPage, scale: 2) else { return }
-        try? data.write(to: url)
+        do {
+            try data.write(to: url)
+            ExportFeedback.saved(url)
+        } catch {
+            ExportFeedback.failed(error)
+        }
     }
 }

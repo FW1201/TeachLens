@@ -147,6 +147,10 @@ if [[ -f "$ICON_SOURCE" ]] && command -v sips >/dev/null && command -v iconutil 
     iconutil -c icns "$ICONSET" -o "$APP_PATH/Contents/Resources/TeachLens.icns"
 fi
 
+# The commit shown in Settings ▸ Check & Test, so testers can tell builds apart.
+COMMIT="${TEACHLENS_COMMIT:-$(git -C "$ROOT_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)}"
+COMMIT="${COMMIT//[^0-9A-Za-z]/}"
+
 cat > "$APP_PATH/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -170,6 +174,8 @@ cat > "$APP_PATH/Contents/Info.plist" <<PLIST
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
     <string>$VERSION</string>
+    <key>TeachLensCommit</key>
+    <string>$COMMIT</string>
     <key>CFBundleVersion</key>
     <string>$BUILD_NUMBER</string>
     <key>LSApplicationCategoryType</key>

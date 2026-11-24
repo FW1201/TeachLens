@@ -111,14 +111,13 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
         guard !didShowPermissionHint else { return }
         didShowPermissionHint = true
         let alert = NSAlert()
-        alert.messageText = "Allow Input Monitoring to show keystrokes"
-        alert.informativeText = """
-        TeachLens needs Input Monitoring to see which keys and mouse buttons you press. It only listens; it never changes or records your input.
-
-        Turn on TeachLens in System Settings ▸ Privacy & Security ▸ Input Monitoring, then quit and reopen TeachLens.
-        """
-        alert.addButton(withTitle: "Open Input Monitoring Settings…")
-        alert.addButton(withTitle: "Not Now")
+        alert.messageText = L10n.t("Allow Input Monitoring to show keystrokes", "顯示按鍵需要「輸入監控」權限")
+        alert.informativeText = L10n.t(
+            "TeachLens only listens to which keys you press; it never changes or records your input. Turn on TeachLens in System Settings ▸ Privacy & Security ▸ Input Monitoring, then quit and reopen TeachLens.",
+            "TeachLens 只會讀取你按了哪些鍵，不會修改或記錄輸入內容。請到「系統設定 ▸ 隱私權與安全性 ▸ 輸入監控」開啟 TeachLens，再結束並重新打開。"
+        )
+        alert.addButton(withTitle: L10n.t("Open Input Monitoring Settings…", "打開輸入監控設定…"))
+        alert.addButton(withTitle: L10n.t("Not Now", "稍後"))
         if let icon = TeachLensAppIcon.standardIcon() {
             alert.icon = icon
         }
@@ -126,6 +125,59 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
         if alert.runModal() == .alertFirstButtonReturn {
             InputMonitoringPermission.openSettings()
         }
+    }
+
+    // MARK: Test center
+
+    /// The demo sequence used by Settings ▸ Check & Test: ⌘C, ⇧⌘4, ⌘Z ×3.
+    /// Times are seconds from the start.
+    static let demoSequence: [(TimeInterval, KeystrokeInput.Kind)] = [
+        (0.0, .keyDown(name: KeyName.metaLeft)), (0.15, .keyDown(name: "KeyC")),
+        (0.30, .keyUp(name: "KeyC")), (0.45, .keyUp(name: KeyName.metaLeft)),
+        (1.4, .keyDown(name: KeyName.shiftLeft)), (1.5, .keyDown(name: KeyName.metaLeft)),
+        (1.65, .keyDown(name: "Num4")), (1.8, .keyUp(name: "Num4")),
+        (1.9, .keyUp(name: KeyName.metaLeft)), (1.95, .keyUp(name: KeyName.shiftLeft)),
+        (3.0, .keyDown(name: KeyName.metaLeft)),
+        (3.15, .keyDown(name: "KeyZ")), (3.25, .keyUp(name: "KeyZ")),
+        (3.45, .keyDown(name: "KeyZ")), (3.55, .keyUp(name: "KeyZ")),
+        (3.75, .keyDown(name: "KeyZ")), (3.85, .keyUp(name: "KeyZ")),
+        (4.0, .keyUp(name: KeyName.metaLeft)),
+    ]
+
+    /// Plays the demo through the real HUD. Needs no Input Monitoring, so the
+    /// HUD can be checked and screenshotted on any Mac.
+    func playDemo() {
+        ensurePanel()
+        startTimer()
+        let mouse = NSEvent.mouseLocation
+        let primaryHeight = NSScreen.screens.first?.frame.maxY ?? 0
+        let x = Double(mouse.x), y = Double(primaryHeight - mouse.y)
+        for (delay, kind) in Self.demoSequence {
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                self?.handle(KeystrokeInput(kind: kind, x: x, y: y))
+            }
+        }
+    }
+
+    /// The display groups the demo produces, for self-tests.
+    /// The combination on screen at the end of each step of the demo (a
+    /// pause of more than half a second ends a step), for self-tests.
+    static func demoGroups() -> [KeystrokeDisplayGroup] {
+        var engine = KeystrokeEngine(config: KeystrokeEngineConfig())
+        var shown: [KeystrokeDisplayGroup] = []
+        for (index, step) in demoSequence.enumerated() {
+            switch step.1 {
+            case .keyDown(let name): engine.keyDown(name, at: step.0)
+            case .keyUp(let name): engine.keyUp(name, at: step.0)
+            default: break
+            }
+            let next = index + 1 < demoSequence.count ? demoSequence[index + 1].0 : .infinity
+            if next - step.0 > 0.5, let group = engine.groups.last {
+                shown.append(KeystrokeDisplayGroup.make(from: group, index: shown.count))
+            }
+        }
+        return shown
     }
 
     private func startTimer() {
@@ -325,7 +377,24 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
     }
 
     @objc private func toggleShortcutsOnly() {
+        if settings.filter != .none && !Self.confirmEveryKey() { return }
         update { $0.filter = $0.filter == .none ? .modifiers : .none }
+    }
+
+    /// Asks before showing every key: typed text becomes visible to everyone
+    /// watching the screen.
+    static func confirmEveryKey() -> Bool {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = L10n.t("Show every key you type?", "要顯示你打的每個字嗎？")
+        alert.informativeText = L10n.t(
+            "Everything you type, not just shortcuts, will appear on screen and in recordings. Turn it off before typing anything private while sharing your screen.",
+            "不只快捷鍵，你打的每個字都會出現在畫面和錄影上。分享螢幕時要輸入私人內容前，請先切回「只顯示快捷鍵」。"
+        )
+        alert.addButton(withTitle: L10n.t("Show Every Key", "顯示每個鍵"))
+        alert.addButton(withTitle: L10n.t("Cancel", "取消"))
+        NSApp.activate(ignoringOtherApps: true)
+        return alert.runModal() == .alertFirstButtonReturn
     }
 
     @objc private func toggleMouseEvents() {

@@ -331,6 +331,21 @@ final class SpotlightController: NSObject, NSMenuItemValidation {
         }
     }
 
+    /// Shows the "find my cursor" pulse now (Settings ▸ Check & Test).
+    func pulseNow() {
+        ensurePanel()
+        applyStyle()
+        updateLayers(force: true)
+        panel?.orderFrontRegardless()
+        runPulse()
+        if !needsPanel {
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 1_200_000_000)
+                self?.refreshRunningState()
+            }
+        }
+    }
+
     private func runPulse() {
         let r: CGFloat = 70
         CATransaction.begin()
