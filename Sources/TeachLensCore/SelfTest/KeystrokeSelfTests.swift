@@ -164,8 +164,17 @@ enum KeystrokeSelfTests {
         tap.keyUp(KeyName.metaLeft, at: 0.1)
         try expect(tap.visibleGroups(at: 0.2).isEmpty, "A quick ⌘ tap should not show")
 
-        // Holding ⌥ to explain it shows it, briefly after release, then hides.
-        var hold = engine { $0.lingerDuration = 3 }
+        // With the shortcuts filter, holding modifiers alone never shows.
+        var shortcutsOnly = engine { $0.filter = .modifiers }
+        shortcutsOnly.keyDown(KeyName.metaLeft, at: 0)
+        shortcutsOnly.keyDown(KeyName.shiftLeft, at: 0.1)
+        try expect(shortcutsOnly.visibleGroups(at: 1).isEmpty, "Held ⌘⇧ alone should not show with the shortcuts filter")
+        shortcutsOnly.keyDown("KeyS", at: 1.1)
+        try expect(names(shortcutsOnly.visibleGroups(at: 1.1).last) == [KeyName.metaLeft, KeyName.shiftLeft, "KeyS"],
+                   "⌘⇧S should show once the combination is complete")
+
+        // Showing all keys: holding ⌥ to explain it shows it, briefly after release, then hides.
+        var hold = engine { $0.lingerDuration = 3; $0.filter = .none }
         hold.keyDown(KeyName.alt, at: 0)
         try expect(names(hold.visibleGroups(at: 0.5).last) == [KeyName.alt], "A held ⌥ should show")
         hold.keyUp(KeyName.alt, at: 1.0)

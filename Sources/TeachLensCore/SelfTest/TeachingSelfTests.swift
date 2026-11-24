@@ -94,8 +94,9 @@ enum TeachingSelfTests {
         try expect(home.x + GraphicalToolsLayout.width <= screen.maxX && home.y >= screen.minY,
                    "The launcher should dock inside the bottom-right corner")
         let offRight = GraphicalToolsLayout.clampedOrigin(CGPoint(x: 5000, y: -300), in: screen)
-        try expect(offRight.x == screen.maxX - GraphicalToolsLayout.width && offRight.y == screen.minY,
-                   "A launcher dragged off screen should be pulled back inside")
+        let inset = GraphicalToolsLayout.edgeInset
+        try expect(offRight.x == screen.maxX - GraphicalToolsLayout.width - inset && offRight.y == screen.minY + inset,
+                   "A launcher dragged off screen should be pulled back inside, clear of the edge")
         let tooHigh = GraphicalToolsLayout.clampedOrigin(CGPoint(x: 100, y: screen.maxY), in: screen)
         try expect(screen.maxY - tooHigh.y >= GraphicalToolsLayout.minimumRoomAbove,
                    "The launcher should keep room above it to open the column")

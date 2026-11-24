@@ -4,18 +4,22 @@ import SwiftUI
 /// Geometry for the floating launcher and its upward tool column. Kept free of
 /// AppKit state so the self-tests can check it.
 enum GraphicalToolsLayout {
-    static let width: CGFloat = 58
+    /// Icon (30) plus a 10 pt glass rim on each side: snug around the icons.
+    static let width: CGFloat = 50
     static let collapsedHeight: CGFloat = 56
-    static let maxExpandedHeight: CGFloat = 540
+    static let maxExpandedHeight: CGFloat = 600
     /// Room kept above the launcher so the column always has space to open.
     static let minimumRoomAbove: CGFloat = 190
-    static let margin: CGFloat = 16
+    /// Default dock distance from the screen corner.
+    static let margin: CGFloat = 24
+    /// Closest the launcher may be dragged to any screen edge.
+    static let edgeInset: CGFloat = 12
     /// Panel padding (3 on each side), the gap between column and launcher,
     /// and the column's own vertical padding and row spacing.
     static let panelPadding: CGFloat = 6
     static let columnGap: CGFloat = 5
     static let columnPadding: CGFloat = 20
-    static let rowSpacing: CGFloat = 5
+    static let rowSpacing: CGFloat = 10
     /// The "students can't see this" marker row under the tools.
     static let markerHeight: CGFloat = 14
 
@@ -37,8 +41,10 @@ enum GraphicalToolsLayout {
 
     /// Keeps the launcher fully on screen and leaves room above it to expand.
     static func clampedOrigin(_ origin: CGPoint, in bounds: CGRect, scale: CGFloat = 1) -> CGPoint {
-        let x = min(max(origin.x, bounds.minX), max(bounds.minX, bounds.maxX - width(scale: scale)))
-        let y = min(max(origin.y, bounds.minY), max(bounds.minY, bounds.maxY - minimumRoomAbove))
+        let minX = bounds.minX + edgeInset
+        let minY = bounds.minY + edgeInset
+        let x = min(max(origin.x, minX), max(minX, bounds.maxX - width(scale: scale) - edgeInset))
+        let y = min(max(origin.y, minY), max(minY, bounds.maxY - minimumRoomAbove))
         return CGPoint(x: x, y: y)
     }
 
@@ -536,7 +542,7 @@ private struct GraphicalToolsView: View {
     private var list: some View {
         let pinned = tools.pinnedInOrder
         return ScrollView {
-            VStack(spacing: 5) {
+            VStack(spacing: GraphicalToolsLayout.rowSpacing) {
                 moreMenu.staggered(pinned.count + 1)
                 ForEach(Array(pinned.reversed().enumerated()), id: \.element) { index, tool in
                     toolView(tool).staggered(pinned.count - index)
