@@ -24,6 +24,7 @@ final class HotkeyService {
     private var demoMirrorWindowHotKeyRef: EventHotKeyRef?
     private var breakHotKeyRef: EventHotKeyRef?
     private var keystrokeHotKeyRef: EventHotKeyRef?
+    private var spotlightHotKeyRef: EventHotKeyRef?
     private var zoomInNavRef: EventHotKeyRef?
     private var zoomOutNavRef: EventHotKeyRef?
     private var eventHandlerRef: EventHandlerRef?
@@ -143,6 +144,7 @@ final class HotkeyService {
                 case 17: command = .toggleDemoMirror(scope: .region)
                 case 18: command = .toggleDemoMirror(scope: .window)
                 case 19: command = .toggleKeystrokes
+                case 20: command = .toggleSpotlight
                 default: return noErr
                 }
 
@@ -324,6 +326,19 @@ final class HotkeyService {
             )
         }
 
+        // Spotlight toggle (TeachLens addition, default Control+Shift+0).
+        let spotlightSettings = SpotlightSettingsStore().load()
+        if spotlightSettings.toggleKeyCode != 0 {
+            RegisterEventHotKey(
+                UInt32(spotlightSettings.toggleKeyCode),
+                carbonModifiers(from: NSEvent.ModifierFlags(rawValue: spotlightSettings.toggleModifiers)),
+                EventHotKeyID(signature: signature, id: 20),
+                target,
+                0,
+                &spotlightHotKeyRef
+            )
+        }
+
         // DemoMirror: the base shortcut mirrors the whole screen; the same
         // shortcut with Shift toggled selects a region to mirror; with Option
         // toggled it mirrors the window under the cursor.
@@ -429,6 +444,10 @@ final class HotkeyService {
             UnregisterEventHotKey(keystrokeHotKeyRef)
         }
         keystrokeHotKeyRef = nil
+        if let spotlightHotKeyRef {
+            UnregisterEventHotKey(spotlightHotKeyRef)
+        }
+        spotlightHotKeyRef = nil
     }
 
     private func carbonModifiers(from flags: NSEvent.ModifierFlags) -> UInt32 {

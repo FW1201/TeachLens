@@ -225,8 +225,10 @@ enum KeystrokeSelfTests {
         let app = AppSettings.defaults
         let control = NSEvent.ModifierFlags.control.rawValue
         let shift = NSEvent.ModifierFlags.shift.rawValue
-        try expect(HotkeyConflicts.conflict(keyCode: kVK_ANSI_0, modifiers: control, app: app) == nil,
-                   "Control+0 should be free")
+        try expect(HotkeyConflicts.conflict(keyCode: kVK_ANSI_0, modifiers: control, app: app, ignoring: "Show Keystrokes") == nil,
+                   "Control+0 should be free apart from the keystroke toggle itself")
+        try expect(HotkeyConflicts.conflict(keyCode: kVK_ANSI_0, modifiers: control | shift, app: app) == "Spotlight",
+                   "Control+Shift+0 should belong to the spotlight")
         try expect(HotkeyConflicts.conflict(keyCode: app.hotKeyCode, modifiers: app.hotKeyModifiers, app: app) == "Static Zoom",
                    "The zoom shortcut should be reported as taken")
         try expect(HotkeyConflicts.conflict(keyCode: app.recordHotKeyCode, modifiers: app.recordHotKeyModifiers | shift, app: app) == "Record Region",

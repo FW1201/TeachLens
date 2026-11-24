@@ -33,6 +33,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
     private let userSelectedResourceAccess: UserSelectedResourceAccess
     private var settings: AppSettings
     private let keystrokeController: KeystrokeController?
+    private let spotlightController: SpotlightController?
 
     private static let homepageURLString = "https://github.com/FW1201/keyviz-for-Mac"
     private static let contentWidth: CGFloat = 540
@@ -126,9 +127,11 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         onRequestCamera: @escaping () -> Void,
         onOpenTrimEditor: @escaping () -> Void,
         userSelectedResourceAccess: UserSelectedResourceAccess,
-        keystrokeController: KeystrokeController? = nil
+        keystrokeController: KeystrokeController? = nil,
+        spotlightController: SpotlightController? = nil
     ) {
         self.keystrokeController = keystrokeController
+        self.spotlightController = spotlightController
         self.settingsStore = settingsStore
         self.onHotKeyChange = onHotKeyChange
         self.onSuspendHotkeys = onSuspendHotkeys
@@ -180,7 +183,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
     /// The Options dialog tabs, in order. Zoom and Live Zoom are separate tabs
     /// (matching Windows ZoomIt, whose Zoom tab holds static-zoom settings only).
     static var settingsTabTitles: [String] {
-        var titles = ["General", "Keystrokes", "Zoom", "Live Zoom", "Draw", "Type"]
+        var titles = ["General", "Keystrokes", "Spotlight", "Zoom", "Live Zoom", "Draw", "Type"]
         #if !TEACHLENS_APP_STORE
         titles.append("DemoType")
         #endif
@@ -192,6 +195,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         switch title {
         case "General": return makeGeneralTab()
         case "Keystrokes": return makeKeystrokesTab()
+        case "Spotlight": return makeSpotlightTab()
         case "Zoom": return makeZoomTab()
         case "Live Zoom": return makeLiveZoomTab()
         case "Draw": return makeDrawTab()
@@ -398,6 +402,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         switch title {
         case "General": return "gearshape"
         case "Keystrokes": return "command"
+        case "Spotlight": return "light.max"
         case "Zoom": return "plus.magnifyingglass"
         case "Live Zoom": return "magnifyingglass.circle"
         case "Draw": return "pencil.tip"
@@ -651,6 +656,14 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
             loadAppSettings: { store.load() }
         )
         .frame(width: Self.contentWidth, height: 460)
+        return NSHostingView(rootView: pane)
+    }
+
+    private func makeSpotlightTab() -> NSView {
+        guard let spotlightController else { return NSView() }
+        let store = settingsStore
+        let pane = SpotlightSettingsPane(controller: spotlightController, loadAppSettings: { store.load() })
+            .frame(width: Self.contentWidth, height: 460)
         return NSHostingView(rootView: pane)
     }
 

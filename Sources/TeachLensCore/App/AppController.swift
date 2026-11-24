@@ -8,6 +8,7 @@ final class AppController: NSObject {
     private let modeCoordinator: ModeCoordinator
     private let userSelectedResourceAccess: UserSelectedResourceAccess
     let keystrokeController: KeystrokeController
+    let spotlightController: SpotlightController
     /// One-shot observer used to re-present the permissions dialog when the user
     /// returns to TeachLens after being sent to System Settings.
     private var permissionReactivationObserver: NSObjectProtocol?
@@ -21,7 +22,8 @@ final class AppController: NSObject {
         onRequestCamera: { [weak self] in self?.permissionService.requestCameraAccess(completion: nil) },
         onOpenTrimEditor: { [weak self] in self?.modeCoordinator.openTrimEditor() },
         userSelectedResourceAccess: userSelectedResourceAccess,
-        keystrokeController: keystrokeController
+        keystrokeController: keystrokeController,
+        spotlightController: spotlightController
     )
 
     init(
@@ -30,7 +32,8 @@ final class AppController: NSObject {
         hotkeyService: HotkeyService,
         modeCoordinator: ModeCoordinator,
         userSelectedResourceAccess: UserSelectedResourceAccess,
-        keystrokeController: KeystrokeController
+        keystrokeController: KeystrokeController,
+        spotlightController: SpotlightController
     ) {
         self.settingsStore = settingsStore
         self.permissionService = permissionService
@@ -38,6 +41,7 @@ final class AppController: NSObject {
         self.modeCoordinator = modeCoordinator
         self.userSelectedResourceAccess = userSelectedResourceAccess
         self.keystrokeController = keystrokeController
+        self.spotlightController = spotlightController
         super.init()
     }
 
@@ -71,6 +75,10 @@ final class AppController: NSObject {
 
     @objc func toggleKeystrokes() {
         keystrokeController.toggle()
+    }
+
+    @objc func toggleSpotlight() {
+        spotlightController.toggleSpotlight()
     }
 
     @objc func showSettings() {

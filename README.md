@@ -27,6 +27,7 @@ TeachLens as a whole is distributed under the **GNU GPL-3.0** ([LICENSE](LICENSE
 | Snip to clipboard / file / OCR | Control+6 / Control+Shift+6 / Control+Option+6 |
 | Panorama to clipboard / file | Control+8 / Control+Shift+8 |
 | Show / hide keystrokes | Control+0 |
+| Spotlight | Control+Shift+0 |
 
 All hotkeys are configurable in Settings.
 

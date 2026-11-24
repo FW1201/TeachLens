@@ -40,17 +40,21 @@ enum HotkeyConflicts {
         list.append(Shortcut(name: "DemoType", keyCode: app.demoTypeHotKeyCode, modifiers: app.demoTypeHotKeyModifiers))
         list.append(Shortcut(name: "DemoType Reset", keyCode: app.demoTypeHotKeyCode, modifiers: app.demoTypeHotKeyModifiers ^ shift))
         #endif
+        let keystrokes = KeystrokeSettingsStore().load()
+        list.append(Shortcut(name: "Show Keystrokes", keyCode: keystrokes.toggleKeyCode, modifiers: keystrokes.toggleModifiers))
+        let spotlight = SpotlightSettingsStore().load()
+        list.append(Shortcut(name: "Spotlight", keyCode: spotlight.toggleKeyCode, modifiers: spotlight.toggleModifiers))
         // A key code of 0 disables a shortcut.
         return list.filter { $0.keyCode != 0 }
     }
 
     /// The name of the existing shortcut that `keyCode` + `modifiers` would
     /// collide with, or nil when it is free.
-    static func conflict(keyCode: Int, modifiers: UInt, app: AppSettings) -> String? {
+    static func conflict(keyCode: Int, modifiers: UInt, app: AppSettings, ignoring own: String? = nil) -> String? {
         guard keyCode != 0 else { return nil }
         let wanted = normalized(modifiers)
         return registeredShortcuts(app: app).first {
-            $0.keyCode == keyCode && normalized($0.modifiers) == wanted
+            $0.name != own && $0.keyCode == keyCode && normalized($0.modifiers) == wanted
         }?.name
     }
 

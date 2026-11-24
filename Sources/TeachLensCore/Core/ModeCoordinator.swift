@@ -65,6 +65,7 @@ final class ModeCoordinator {
     var onEndLiveZoomNavigation: (() -> Void)?
     /// Toggles the keystroke overlay (owned by KeystrokeController).
     var onToggleKeystrokes: (() -> Void)?
+    var onToggleSpotlight: (() -> Void)?
     /// Extra TeachLens windows (the keystroke HUD) to keep out of the zoom
     /// source capture, so they are not frozen into or magnified by zoom.
     var additionalCaptureExclusions: (() -> [Int])?
@@ -154,6 +155,8 @@ final class ModeCoordinator {
             toggleBreakTimer()
         case .toggleKeystrokes:
             onToggleKeystrokes?()
+        case .toggleSpotlight:
+            onToggleSpotlight?()
         case .toggleDemoMirror(let scope):
             demoMirrorController.toggle(scope: scope)
         case .setTool(let tool):

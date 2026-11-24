@@ -30,6 +30,7 @@ public enum SelfTestRunner {
     public static func run() throws {
         try testAppInfoVersionResolution()
         try KeystrokeSelfTests.run()
+        try TeachingSelfTests.run()
         try testViewportClampsZoom()
         try testViewportZoomAnimation()
         try testZoomAnimationTimingAndEndpoints()

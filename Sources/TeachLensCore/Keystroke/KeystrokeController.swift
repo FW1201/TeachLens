@@ -14,6 +14,7 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
     private var timer: Timer?
     private var screenFrame: CGRect = .zero
     private var didShowPermissionHint = false
+    private var permissionRetryTimer: Timer?
 
     /// Called after the toggle hotkey changes so global hotkeys can re-register.
     var onHotkeyChange: (() -> Void)?
@@ -34,8 +35,20 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
 
     func start() {
         if settings.enabled {
-            activate(promptForPermission: true)
+            // At launch, rely on the system prompt only; a second modal alert
+            // on top of it (and the first-launch Settings window) is noise.
+            activate(promptForPermission: true, showHint: false)
         }
+        // If Input Monitoring is granted while TeachLens is running, start
+        // listening without requiring the menu toggle.
+        let retry = Timer(timeInterval: 3, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.settings.enabled, !self.isActive, InputMonitoringPermission.isGranted else { return }
+                self.activate(promptForPermission: false, showHint: false)
+            }
+        }
+        RunLoop.main.add(retry, forMode: .common)
+        permissionRetryTimer = retry
     }
 
     func stop() {
@@ -72,12 +85,12 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
 
     // MARK: Activation
 
-    private func activate(promptForPermission: Bool) {
+    private func activate(promptForPermission: Bool, showHint: Bool = true) {
         if !InputMonitoringPermission.isGranted && promptForPermission {
             InputMonitoringPermission.request()
         }
         guard let tap, tap.start() else {
-            showPermissionHintOnce()
+            if showHint { showPermissionHintOnce() }
             return
         }
         ensurePanel()

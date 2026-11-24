@@ -72,7 +72,8 @@ struct KeystrokeSettingsPane: View {
                 if let conflict = HotkeyConflicts.conflict(
                     keyCode: draft.toggleKeyCode,
                     modifiers: draft.toggleModifiers,
-                    app: loadAppSettings()
+                    app: loadAppSettings(),
+                    ignoring: "Show Keystrokes"
                 ) {
                     Label("Also used by \(conflict). Pick another shortcut.", systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)

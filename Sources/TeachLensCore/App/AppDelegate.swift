@@ -70,8 +70,16 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         modeCoordinator.onToggleKeystrokes = { [weak keystrokeController] in
             keystrokeController?.toggle()
         }
-        modeCoordinator.additionalCaptureExclusions = { [weak keystrokeController] in
-            keystrokeController?.windowNumberForCaptureExclusion.map { [$0] } ?? []
+        let spotlightController = SpotlightController()
+        spotlightController.onHotkeyChange = { [weak hotkeyService] in
+            hotkeyService?.reloadHotkey()
+        }
+        modeCoordinator.onToggleSpotlight = { [weak spotlightController] in
+            spotlightController?.toggleSpotlight()
+        }
+        modeCoordinator.additionalCaptureExclusions = { [weak keystrokeController, weak spotlightController] in
+            [keystrokeController?.windowNumberForCaptureExclusion, spotlightController?.windowNumberForCaptureExclusion]
+                .compactMap { $0 }
         }
         modeCoordinator.keystrokeFrameProvider = { [weak keystrokeController] in
             keystrokeController?.recordingFrame()
@@ -83,7 +91,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             hotkeyService: hotkeyService,
             modeCoordinator: modeCoordinator,
             userSelectedResourceAccess: userSelectedResourceAccess,
-            keystrokeController: keystrokeController
+            keystrokeController: keystrokeController,
+            spotlightController: spotlightController
         )
 
         statusItem = makeStatusItem(controller: appController!)
@@ -92,6 +101,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         hotkeyService.start()
         keystrokeController.start()
+        spotlightController.start()
 
         // On a fresh install, open Settings so the user has a clear entry point
         // instead of a silent menu-bar-only launch (issue #21). Upgrading users
@@ -163,6 +173,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             optionsItem.submenu = controller.keystrokeController.makeMenu()
             menu.insertItem(optionsItem, at: index + 1)
         }
+        if let index = menu.items.firstIndex(where: { $0.action == #selector(AppController.toggleSpotlight) }) {
+            let toggleItem = menu.items[index]
+            toggleItem.target = controller.spotlightController
+            toggleItem.action = #selector(SpotlightController.toggleSpotlight)
+            let optionsItem = NSMenuItem(title: "Spotlight Options", action: nil, keyEquivalent: "")
+            optionsItem.submenu = controller.spotlightController.makeMenu()
+            menu.insertItem(optionsItem, at: index + 1)
+        }
 
         item.menu = menu
         return item
@@ -201,6 +219,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             StatusMenuEntry(title: "DemoMirror", action: #selector(AppController.toggleDemoMirror), keyEquivalent: ""),
             StatusMenuEntry(title: "Break Timer", action: #selector(AppController.toggleBreakTimer), keyEquivalent: ""),
             StatusMenuEntry(title: "Show Keystrokes", action: #selector(AppController.toggleKeystrokes), keyEquivalent: ""),
+            StatusMenuEntry(title: "Spotlight", action: #selector(AppController.toggleSpotlight), keyEquivalent: ""),
             .separator,
             StatusMenuEntry(title: "Check Permissions", action: #selector(AppController.checkPermissions), keyEquivalent: ""),
             StatusMenuEntry(title: "Quit", action: #selector(AppController.quit), keyEquivalent: "q")
