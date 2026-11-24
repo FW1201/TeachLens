@@ -80,6 +80,9 @@ final class CaptionOverlayModel: ObservableObject {
     @Published var status: String?
     /// Distance from the screen edges, moved so captions never sit on top of
     /// the keystroke pills or a video call's control bar.
+    /// Microphone state for the status light, and the recognition language.
+    @Published var listening = false
+    @Published var language = "中"
     @Published var topPadding: CGFloat = 72
     @Published var bottomPadding: CGFloat = 150
 }
@@ -117,6 +120,15 @@ final class CaptionController: NSObject, NSMenuItemValidation {
         super.init()
         model.fontSize = settings.fontSize
         model.atTop = settings.atTop
+        model.language = Self.shortLanguage(settings.localeIdentifier)
+    }
+
+    /// A one- or two-character label for the caption chip: 中, EN, 日, 한.
+    static func shortLanguage(_ id: String) -> String {
+        if id.hasPrefix("zh") { return "中" }
+        if id.hasPrefix("ja") { return "日" }
+        if id.hasPrefix("ko") { return "한" }
+        return String(id.prefix(2)).uppercased()
     }
 
     private static func now() -> TimeInterval { ProcessInfo.processInfo.systemUptime }
@@ -132,6 +144,7 @@ final class CaptionController: NSObject, NSMenuItemValidation {
         settings.fontSize = min(max(settings.fontSize, 16), 72)
         guard settings != old else { return }
         store.save(settings)
+        model.language = Self.shortLanguage(settings.localeIdentifier)
         model.fontSize = settings.fontSize
         model.atTop = settings.atTop
         if old.localeIdentifier != settings.localeIdentifier && isRunning {
@@ -169,6 +182,7 @@ final class CaptionController: NSObject, NSMenuItemValidation {
         guard isRunning else { return }
         flushSentence(force: true)
         isRunning = false
+        model.listening = false
         timer?.invalidate()
         timer = nil
         task?.cancel()
@@ -243,6 +257,7 @@ final class CaptionController: NSObject, NSMenuItemValidation {
 
         if transcript.isEmpty { sessionStart = Self.now() }
         isRunning = true
+        model.listening = true
         model.status = nil
         ensurePanel()
         startRequest()
@@ -325,6 +340,12 @@ final class CaptionController: NSObject, NSMenuItemValidation {
     }
 
     // MARK: Recording sync
+
+    /// True when captions were recognised during the last recording.
+    var hasCaptionsForLastRecording: Bool {
+        guard let range = lastRecording else { return false }
+        return !CaptionFormatter.slice(transcript, from: range.start, to: range.end).isEmpty
+    }
 
     func recordingStateChanged(_ recording: Bool) {
         let t = Self.now() - sessionStart
@@ -528,16 +549,57 @@ struct CaptionOverlayView: View {
     private var caption: some View {
         let text = model.status ?? model.text
         if !text.isEmpty {
-            Text(text)
-                .font(.system(size: model.fontSize, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .padding(.horizontal, 22)
-                .padding(.vertical, 12)
-                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.black.opacity(0.72)))
-                .frame(maxWidth: 1100)
-                .transition(.opacity)
+            HStack(alignment: .center, spacing: 12) {
+                // Status light (green: listening, orange: problem) and language.
+                VStack(spacing: 4) {
+                    Circle()
+                        .fill(model.status != nil ? Color.orange : (model.listening ? Color.green : Color.gray))
+                        .frame(width: 8, height: 8)
+                    Text(model.language)
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.75))
+                }
+                .accessibilityHidden(true)
+                Text(text)
+                    .font(.system(size: model.fontSize, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .modifier(CaptionBackground())
+            .frame(maxWidth: 1100)
+            .transition(.opacity)
         }
+    }
+}
+
+/// Captions sit on dark glass (Liquid Glass on macOS 26) so they match the
+/// keystroke pills and stay legible over video; opaque with Reduce Transparency.
+private struct CaptionBackground: ViewModifier {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+        if reduceTransparency || !KeystrokeGlassSupport.isLiquidGlassAvailable {
+            content.background(shape.fill(Color.black.opacity(0.75)))
+        } else {
+            glass(content, shape: shape)
+        }
+    }
+
+    @ViewBuilder
+    private func glass(_ content: Content, shape: RoundedRectangle) -> some View {
+        #if compiler(>=6.2)
+        if #available(macOS 26.0, *) {
+            content.glassEffect(.regular.tint(Color.black.opacity(0.5)), in: shape)
+        } else {
+            content.background(shape.fill(Color.black.opacity(0.75)))
+        }
+        #else
+        content.background(shape.fill(Color.black.opacity(0.75)))
+        #endif
     }
 }

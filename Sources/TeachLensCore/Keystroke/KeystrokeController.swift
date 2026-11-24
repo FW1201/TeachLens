@@ -24,6 +24,9 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
     /// True while macOS secure input (a password field) is active: nothing is
     /// shown, so typed passwords can never reach the screen.
     private(set) var pausedForSecureInput = false
+    /// Reports whether Control is the only key held (for the shortcut card).
+    var onControlAlone: ((Bool) -> Void)?
+    private var controlAlone = false
     private var displayObserver: NSObjectProtocol?
 
     init(store: KeystrokeSettingsStore = KeystrokeSettingsStore()) {
@@ -262,6 +265,12 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
             engine.mouseMoved(x: input.x, y: input.y, at: now)
         case .scroll(let deltaY):
             engine.scroll(deltaY: deltaY, at: now)
+        }
+        let pressed = engine.pressedKeys
+        let alone = pressed.count == 1 && (pressed[0] == KeyName.controlLeft || pressed[0] == KeyName.controlRight)
+        if alone != controlAlone {
+            controlAlone = alone
+            onControlAlone?(alone)
         }
         publish()
     }

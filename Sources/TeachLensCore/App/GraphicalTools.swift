@@ -49,7 +49,7 @@ enum ToolbarTool: String, CaseIterable, Identifiable, Sendable {
         case .draw: return L10n.t("Draw", "畫筆")
         case .whiteboard: return L10n.t("Whiteboard", "白板")
         case .captions: return L10n.t("Captions", "字幕")
-        case .breakTimer: return L10n.t("Break Timer", "休息計時")
+        case .breakTimer: return L10n.t("Timers", "計時")
         case .screenshot: return L10n.t("Screenshot", "截圖")
         case .record: return L10n.t("Record", "錄影")
         }
@@ -172,7 +172,7 @@ final class GraphicalTools: ObservableObject {
         case .captions: return text(teaching.captions.settings.toggleKeyCode, teaching.captions.settings.toggleModifiers)
         case .zoom: return text(app.hotKeyCode, app.hotKeyModifiers)
         case .draw: return text(app.drawHotKeyCode, app.drawHotKeyModifiers)
-        case .breakTimer: return text(app.breakHotKeyCode, app.breakHotKeyModifiers)
+        case .breakTimer: return "⌃⇧T"
         case .screenshot: return text(app.snipHotKeyCode, app.snipHotKeyModifiers)
         case .record: return text(app.recordHotKeyCode, app.recordHotKeyModifiers)
         case .whiteboard: return "⌃⇧W"
@@ -377,6 +377,10 @@ final class GraphicalTools: ObservableObject {
         scheduleRefresh()
     }
 
+    fileprivate func collapseForMenu() {
+        collapse()
+    }
+
     fileprivate func apply(_ mode: CourseMode) {
         collapse()
         teaching.courseModes.apply(mode)
@@ -485,7 +489,7 @@ private struct GraphicalToolsView: View {
         case .draw:
             actionButton(tool, .activateDrawWithoutZoom)
         case .breakTimer:
-            actionButton(tool, .toggleBreakTimer)
+            menu(tool) { timerItems }
         case .zoom:
             menu(tool) { zoomItems }
         case .screenshot:
@@ -512,6 +516,19 @@ private struct GraphicalToolsView: View {
                 Label(mode.name, systemImage: mode.id == tools.currentCourseModeID ? "checkmark" : mode.symbol)
             }
         }
+    }
+
+    @ViewBuilder private var timerItems: some View {
+        ForEach(ClassCountdown.presets, id: \.self) { minutes in
+            Button {
+                tools.collapseForMenu()
+                ClassCountdown.shared.start(minutes: minutes)
+            } label: {
+                Label(L10n.t("Countdown \(minutes) min", "課堂倒數 \(minutes) 分鐘"), systemImage: "timer")
+            }
+        }
+        Divider()
+        item(L10n.t("Full-Screen Break", "全螢幕休息"), "cup.and.saucer", .toggleBreakTimer)
     }
 
     @ViewBuilder private var zoomItems: some View {
@@ -550,7 +567,8 @@ private struct GraphicalToolsView: View {
         case .captions: item(tool.title, tool.symbol, .toggleCaptions)
         case .whiteboard: item(tool.title, tool.symbol, .toggleWhiteboard)
         case .draw: item(tool.title, tool.symbol, .activateDrawWithoutZoom)
-        case .breakTimer: item(tool.title, tool.symbol, .toggleBreakTimer)
+        case .breakTimer:
+            Menu { timerItems } label: { Label(tool.title, systemImage: tool.symbol) }
         }
     }
 

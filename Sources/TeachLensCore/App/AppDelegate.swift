@@ -15,6 +15,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var onboarding: OnboardingController?
     /// What was showing before "Hide overlays", to bring it back.
     private var hiddenOverlays: (keystrokes: Bool, spotlight: Bool, captions: Bool)?
+    private let shortcutCard = ShortcutCard()
 
     /// Rebuilds the status menu and Settings in the newly chosen language.
     private func applyLanguageChange() {
@@ -122,6 +123,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self, let keystrokeController, let spotlightController, let captionController else { return }
             self.toggleHideOverlays(keystrokes: keystrokeController, spotlight: spotlightController, captions: captionController)
         }
+        modeCoordinator.onToggleCountdown = {
+            ClassCountdown.shared.toggle()
+        }
+        keystrokeController.onControlAlone = { [weak self] alone in
+            self?.shortcutCard.controlHeld(alone: alone)
+        }
         modeCoordinator.additionalCaptureExclusions = { [weak self, weak keystrokeController, weak spotlightController, weak captionController] in
             [
                 keystrokeController?.windowNumberForCaptureExclusion,
@@ -202,6 +209,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.graphicalTools?.recording = recording
             self?.updateRecordingIndicator(recording)
             captionController?.recordingStateChanged(recording)
+            if !recording { self?.offerCaptionExport(captionController) }
         }
         hotkeyService.start()
         keystrokeController.start()
@@ -383,6 +391,24 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             captions.setEnabled(false)
             GlassToast.shared.show(symbol: "eye.slash", title: L10n.t("All overlays hidden", "已隱藏所有畫面提示"),
                                    message: L10n.t("Press ⌃⌥⌘H again to bring them back.", "再按 ⌃⌥⌘H 恢復。"))
+        }
+    }
+
+    /// When a recording ends with captions collected during it, offer the
+    /// matching .srt right away instead of a trip to Settings.
+    private func offerCaptionExport(_ captions: CaptionController?) {
+        Task { @MainActor [weak captions] in
+            // Let the save dialog and the caption bookkeeping settle first.
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            guard let captions, captions.hasCaptionsForLastRecording else { return }
+            GlassToast.shared.show(
+                symbol: "captions.bubble",
+                title: L10n.t("Captions for this recording", "這段錄影有字幕"),
+                message: L10n.t("Save them as an .srt file next to the video.", "可存成 .srt 字幕檔，與影片一起使用。"),
+                action: GlassToast.Action(title: L10n.t("Export", "匯出")) { [weak captions] in
+                    captions?.exportLastRecording()
+                },
+                duration: 8)
         }
     }
 
