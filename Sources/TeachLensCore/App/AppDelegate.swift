@@ -184,7 +184,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let classSession = ClassSession(courseModes: courseModeController, testCenter: testCenter)
         classSession.onChange = { [weak self] inClass in self?.classStateChanged(inClass) }
-        classSession.openCheck = { [weak self] in self?.appController?.showSettings(pane: "Check") }
+        classSession.openCheck = { [weak self] in self?.appController?.openSettingsPane("Check") }
         classSession.isRecording = { [weak self] in self?.isRecording ?? false }
         self.classSession = classSession
 
@@ -391,7 +391,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openCheckAndTest(_ sender: NSMenuItem) {
-        appController?.showSettings(pane: "Check")
+        appController?.openSettingsPane("Check")
     }
 
     /// Menu title and menu-bar tint follow the class state: green while in class.

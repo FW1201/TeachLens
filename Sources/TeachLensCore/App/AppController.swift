@@ -103,7 +103,7 @@ final class AppController: NSObject {
     }
 
     /// Opens Settings on one pane (by its stable id, e.g. "Check").
-    func showSettings(pane: String) {
+    func openSettingsPane(_ pane: String) {
         settingsWindowController.show()
         settingsWindowController.select(pane: pane)
     }
