@@ -99,8 +99,20 @@ enum TeachingSelfTests {
         let tooHigh = GraphicalToolsLayout.clampedOrigin(CGPoint(x: 100, y: screen.maxY), in: screen)
         try expect(screen.maxY - tooHigh.y >= GraphicalToolsLayout.minimumRoomAbove,
                    "The launcher should keep room above it to open the column")
-        try expect(GraphicalToolsLayout.expandedHeight(originY: home.y, in: screen) == GraphicalToolsLayout.maxExpandedHeight,
-                   "On a tall screen the column should open to full height")
+        // On a tall screen the open panel is exactly as tall as its content:
+        // launcher + gap + column, with no empty glass.
+        let items = ToolbarTool.defaultPinned.count + 1
+        let wanted = GraphicalToolsLayout.collapsedHeight(scale: 1) + GraphicalToolsLayout.columnGap
+            + GraphicalToolsLayout.columnHeight(items: items, scale: 1)
+        try expect(GraphicalToolsLayout.expandedHeight(originY: home.y, in: screen, items: items, scale: 1) == wanted,
+                   "The open toolbar should fit its six tools without empty space")
+        try expect(wanted < 400, "Six tools should need well under 400 pt, got \(wanted)")
+        // Large buttons make it taller and wider; small ones smaller.
+        let large = GraphicalToolsLayout.expandedHeight(originY: home.y, in: screen, items: items, scale: ToolbarSize.large.scale)
+        let small = GraphicalToolsLayout.expandedHeight(originY: home.y, in: screen, items: items, scale: ToolbarSize.small.scale)
+        try expect(small < wanted && wanted < large, "Toolbar height should follow the button size")
+        try expect(GraphicalToolsLayout.width(scale: ToolbarSize.large.scale) > GraphicalToolsLayout.width,
+                   "Large buttons need a wider toolbar")
         let short = CGRect(x: 0, y: 0, width: 800, height: 300)
         let low = GraphicalToolsLayout.clampedOrigin(CGPoint(x: 0, y: 200), in: short)
         let height = GraphicalToolsLayout.expandedHeight(originY: low.y, in: short)

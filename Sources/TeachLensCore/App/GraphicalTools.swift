@@ -10,23 +10,68 @@ enum GraphicalToolsLayout {
     /// Room kept above the launcher so the column always has space to open.
     static let minimumRoomAbove: CGFloat = 190
     static let margin: CGFloat = 16
+    /// Panel padding (3 on each side), the gap between column and launcher,
+    /// and the column's own vertical padding and row spacing.
+    static let panelPadding: CGFloat = 6
+    static let columnGap: CGFloat = 5
+    static let columnPadding: CGFloat = 20
+    static let rowSpacing: CGFloat = 5
+    /// The "students can't see this" marker row under the tools.
+    static let markerHeight: CGFloat = 14
+
+    static func width(scale: CGFloat) -> CGFloat { width * scale }
+    static func collapsedHeight(scale: CGFloat) -> CGFloat { panelPadding + 50 * scale }
+
+    /// Height the column needs for `items` icon rows (tools plus More) and the
+    /// marker, so the glass column fits its content with no empty space.
+    static func columnHeight(items: Int, scale: CGFloat) -> CGFloat {
+        let rows = CGFloat(max(1, items))
+        return columnPadding + rows * TeachLensChrome.iconHeight * scale + (rows - 1) * rowSpacing
+            + rowSpacing + markerHeight
+    }
 
     /// Default dock: bottom-right corner of the visible frame.
-    static func defaultOrigin(in bounds: CGRect) -> CGPoint {
-        CGPoint(x: bounds.maxX - width - margin, y: bounds.minY + margin)
+    static func defaultOrigin(in bounds: CGRect, scale: CGFloat = 1) -> CGPoint {
+        CGPoint(x: bounds.maxX - width(scale: scale) - margin, y: bounds.minY + margin)
     }
 
     /// Keeps the launcher fully on screen and leaves room above it to expand.
-    static func clampedOrigin(_ origin: CGPoint, in bounds: CGRect) -> CGPoint {
-        let x = min(max(origin.x, bounds.minX), max(bounds.minX, bounds.maxX - width))
+    static func clampedOrigin(_ origin: CGPoint, in bounds: CGRect, scale: CGFloat = 1) -> CGPoint {
+        let x = min(max(origin.x, bounds.minX), max(bounds.minX, bounds.maxX - width(scale: scale)))
         let y = min(max(origin.y, bounds.minY), max(bounds.minY, bounds.maxY - minimumRoomAbove))
         return CGPoint(x: x, y: y)
     }
 
-    /// Height of the panel when the column is open; the panel grows upward from
-    /// the launcher and scrolls when the screen is short.
-    static func expandedHeight(originY: CGFloat, in bounds: CGRect) -> CGFloat {
-        max(collapsedHeight, min(maxExpandedHeight, bounds.maxY - originY))
+    /// Height of the panel when the column is open: just enough for the
+    /// column, growing upward from the launcher; on a short screen it is
+    /// capped and the column scrolls.
+    static func expandedHeight(originY: CGFloat, in bounds: CGRect,
+                               items: Int = ToolbarTool.defaultPinned.count + 1, scale: CGFloat = 1) -> CGFloat {
+        let wanted = collapsedHeight(scale: scale) + columnGap + columnHeight(items: items, scale: scale)
+        return max(collapsedHeight(scale: scale), min(wanted, bounds.maxY - originY))
+    }
+}
+
+/// The floating toolbar's size: Small, Medium (standard) or Large buttons.
+enum ToolbarSize: String, CaseIterable, Identifiable, Sendable {
+    case small, medium, large
+
+    var id: String { rawValue }
+
+    var scale: CGFloat {
+        switch self {
+        case .small: return 0.85
+        case .medium: return 1
+        case .large: return 1.3
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .small: return L10n.t("Small", "小")
+        case .medium: return L10n.t("Medium", "中")
+        case .large: return L10n.t("Large", "大")
+        }
     }
 }
 
@@ -89,6 +134,7 @@ enum ToolbarTool: String, CaseIterable, Identifiable, Sendable {
 final class GraphicalTools: ObservableObject {
     static let preference = "graphicalToolsEnabled"
     static let pinnedKey = "graphicalToolsPinned"
+    static let sizeKey = "graphicalToolsSize"
     private static let positionKey = "graphicalToolsPosition"
 
     @Published private(set) var expanded = false
@@ -101,6 +147,7 @@ final class GraphicalTools: ObservableObject {
     @Published private(set) var activeTools: Set<ToolbarTool> = []
     @Published private(set) var currentCourseModeID: String?
     @Published private(set) var pinned: [ToolbarTool]
+    @Published private(set) var size: ToolbarSize
     /// True after a few idle seconds: the launcher fades back so it doesn't
     /// distract while teaching.
     @Published private(set) var idle = false
@@ -130,7 +177,18 @@ final class GraphicalTools: ObservableObject {
         self.teaching = teaching
         let saved = UserDefaults.standard.stringArray(forKey: Self.pinnedKey)?.compactMap(ToolbarTool.init(rawValue:))
         self.pinned = (saved?.isEmpty == false ? saved : nil) ?? ToolbarTool.defaultPinned
+        self.size = UserDefaults.standard.string(forKey: Self.sizeKey).flatMap(ToolbarSize.init(rawValue:)) ?? .medium
     }
+
+    fileprivate func setSize(_ newSize: ToolbarSize) {
+        guard newSize != size else { return }
+        size = newSize
+        UserDefaults.standard.set(newSize.rawValue, forKey: Self.sizeKey)
+        if let panel { place(at: panel.frame.origin) }
+    }
+
+    /// Icon rows in the open column: the pinned tools plus More.
+    private var columnItems: Int { pinned.count + 1 }
 
     var windowNumber: Int? {
         guard let panel, panel.isVisible else { return nil }
@@ -151,11 +209,13 @@ final class GraphicalTools: ObservableObject {
             pinned.append(tool)
         }
         UserDefaults.standard.set(pinned.map(\.rawValue), forKey: Self.pinnedKey)
+        if let panel { place(at: panel.frame.origin) }
     }
 
     fileprivate func resetPinned() {
         pinned = ToolbarTool.defaultPinned
         UserDefaults.standard.removeObject(forKey: Self.pinnedKey)
+        if let panel { place(at: panel.frame.origin) }
     }
 
     // MARK: Shortcuts
@@ -240,7 +300,7 @@ final class GraphicalTools: ObservableObject {
         if let x = saved?["x"] as? Double, let y = saved?["y"] as? Double {
             place(at: NSPoint(x: x, y: y))
         } else if let bounds = NSScreen.main?.visibleFrame {
-            place(at: GraphicalToolsLayout.defaultOrigin(in: bounds))
+            place(at: GraphicalToolsLayout.defaultOrigin(in: bounds, scale: size.scale))
         }
         refreshState()
         panel.orderFrontRegardless()
@@ -284,11 +344,14 @@ final class GraphicalTools: ObservableObject {
         let screen = NSScreen.screens.first { $0.visibleFrame.insetBy(dx: -1, dy: -1).contains(origin) }
             ?? NSScreen.main
         guard let bounds = screen?.visibleFrame else { return }
-        let clamped = GraphicalToolsLayout.clampedOrigin(origin, in: bounds)
+        let scale = size.scale
+        let clamped = GraphicalToolsLayout.clampedOrigin(origin, in: bounds, scale: scale)
+        // Open: exactly as tall as the column needs, so there is no empty glass.
         let height = panelTall
-            ? GraphicalToolsLayout.expandedHeight(originY: clamped.y, in: bounds)
-            : GraphicalToolsLayout.collapsedHeight
-        panel.setFrame(NSRect(x: clamped.x, y: clamped.y, width: GraphicalToolsLayout.width, height: height),
+            ? GraphicalToolsLayout.expandedHeight(originY: clamped.y, in: bounds, items: columnItems, scale: scale)
+            : GraphicalToolsLayout.collapsedHeight(scale: scale)
+        panel.setFrame(NSRect(x: clamped.x, y: clamped.y, width: GraphicalToolsLayout.width(scale: scale),
+                              height: height),
                        display: true)
     }
 
@@ -441,7 +504,7 @@ private struct GraphicalToolsView: View {
                         : .move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.92, anchor: .bottom)))
             }
             launcher
-                .frame(height: 50)
+                .frame(height: 50 * tools.size.scale)
                 .opacity(tools.idle && !tools.expanded ? 0.4 : 1)
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 5)
@@ -451,6 +514,7 @@ private struct GraphicalToolsView: View {
         }
         .padding(3)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .environment(\.chromeIconScale, tools.size.scale)
         .contentShape(Rectangle())
         .onHover { tools.pointerInside($0) }
         .onExitCommand { tools.collapse() }
@@ -459,7 +523,11 @@ private struct GraphicalToolsView: View {
     // MARK: Column
 
     private var column: some View {
-        list.chromeSurface(RoundedRectangle(cornerRadius: 23, style: .continuous))
+        // Never taller than its content: no empty glass above the icons.
+        let content = GraphicalToolsLayout.columnHeight(items: tools.pinned.count + 1, scale: tools.size.scale)
+        return list
+            .frame(maxHeight: content)
+            .chromeSurface(RoundedRectangle(cornerRadius: 23 * tools.size.scale, style: .continuous))
     }
 
     /// Top to bottom: More, then the pinned tools reading down toward the
@@ -476,13 +544,13 @@ private struct GraphicalToolsView: View {
                 Image(systemName: "eye.slash")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .frame(height: 14)
+                    .frame(height: GraphicalToolsLayout.markerHeight)
                     .help(L10n.t("Students can't see this toolbar: it is left out of shared screens and recordings.",
                                  "學生看不到這個工具列：分享畫面與錄影都不會擷取到它。"))
                     .accessibilityLabel(L10n.t("Hidden from students", "學生看不到"))
                     .staggered(0)
             }
-            .padding(.vertical, 10)
+            .padding(.vertical, GraphicalToolsLayout.columnPadding / 2)
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
@@ -613,6 +681,14 @@ private struct GraphicalToolsView: View {
                     }
                 }
                 Divider()
+                Section(L10n.t("Button size", "按鈕大小")) {
+                    ForEach(ToolbarSize.allCases) { option in
+                        Button { tools.setSize(option) } label: {
+                            Label(option.title, systemImage: option == tools.size ? "checkmark" : "textformat.size")
+                        }
+                    }
+                }
+                Divider()
                 Button { tools.resetPinned() } label: {
                     Label(L10n.t("Back to the default six", "回復預設六項"), systemImage: "arrow.counterclockwise")
                 }
@@ -683,10 +759,10 @@ private struct GraphicalToolsView: View {
         let onNames = ToolbarTool.allCases.filter { tools.activeTools.contains($0) }.map(\.title)
         let control = Button { tools.toggleExpanded() } label: {
             Image(systemName: symbol)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 16 * tools.size.scale, weight: .semibold))
                 .foregroundStyle(tools.recording && !tools.expanded ? Color.red : Color.primary)
                 .contentTransition(.symbolEffect(.replace))
-                .frame(width: 36, height: 36)
+                .frame(width: 36 * tools.size.scale, height: 36 * tools.size.scale)
                 .overlay(alignment: .bottom) {
                     if !tools.expanded { statusDots.offset(y: -3) }
                 }
