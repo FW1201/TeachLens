@@ -28,6 +28,7 @@ enum KeystrokeSelfTests {
         try testKeystrokeDefaultHotkeyDoesNotCollideWithZoomIt()
         try testHotkeyConflictDetection()
         try testRecordingCompositePlacesHUD()
+        try testCustomShortcuts()
     }
 
     private static func expect(_ condition: Bool, _ message: String) throws {
@@ -366,5 +367,46 @@ enum KeystrokeSelfTests {
         try expect(brightness(x: 20, yFromTop: 70) > 600, "HUD should be drawn near the bottom-left")
         try expect(brightness(x: 20, yFromTop: 10) < 30, "Top of the frame should stay untouched")
         try expect(brightness(x: 60, yFromTop: 70) < 30, "Area right of the HUD should stay untouched")
+    }
+
+    private static func testCustomShortcuts() throws {
+        var settings = KeystrokeSettings()
+        try expect(settings.customShortcuts.isEmpty, "No custom shortcuts by default")
+        settings.customShortcuts = [
+            CustomShortcut(keys: ["KeyB"], label: "筆刷"),
+            CustomShortcut(keys: [KeyName.metaLeft, "KeyK"], label: "插入連結", windows: "Ctrl + K")
+        ]
+        let config = settings.engineConfig
+        try expect(config.extraKeys == ["KeyB"], "Only keys without a modifier lead, got \(config.extraKeys)")
+
+        // A single key the teacher added shows even in "Shortcuts only".
+        var e = KeystrokeEngine(config: config)
+        e.keyDown("KeyB", at: 0)
+        try expect(names(e.groups.last) == ["KeyB"], "Custom single key B should show, got \(names(e.groups.last))")
+        var plain = KeystrokeEngine(config: config)
+        plain.keyDown("KeyH", at: 0)
+        try expect(plain.groups.isEmpty, "Other plain keys stay hidden")
+
+        // Caption and Windows override; right Command counts as Command.
+        let group = KeystrokeGroup(keys: [
+            KeystrokeKey(name: KeyName.metaRight, at: 0),
+            KeystrokeKey(name: "KeyK", at: 0)
+        ], createdAt: 0)
+        let display = KeystrokeDisplayGroup.make(from: group, index: 0, custom: settings.customShortcuts)
+        try expect(display.customLabel == "插入連結", "Expected the caption, got \(display.customLabel ?? "nil")")
+        try expect(display.windowsText == "Ctrl + K", "Expected the Windows override, got \(display.windowsText ?? "nil")")
+        try expect(display.windowsPrimary()?.customLabel == "插入連結", "Windows-first keeps the caption")
+        let other = KeystrokeDisplayGroup.make(from: group, index: 0)
+        try expect(other.customLabel == nil, "No caption without custom shortcuts")
+
+        try expect(settings.customShortcuts[1].displayText == "⌘K", "Expected ⌘K, got \(settings.customShortcuts[1].displayText)")
+        try expect(KeyComboRecorder.keys(keyCode: kVK_ANSI_K, flags: NSEvent.ModifierFlags.command.rawValue) == [KeyName.metaLeft, "KeyK"],
+                   "Recorder should record ⌘K")
+        try expect(KeyComboRecorder.keys(keyCode: kVK_F5, flags: 0) == ["F5"], "Recorder should accept F5 alone")
+        try expect(KeyComboRecorder.keys(keyCode: kVK_Shift, flags: 0) == nil, "A bare modifier is not a shortcut")
+
+        let data = try JSONEncoder().encode(settings)
+        let decoded = try JSONDecoder().decode(KeystrokeSettings.self, from: data)
+        try expect(decoded.customShortcuts == settings.customShortcuts, "Custom shortcuts should round-trip")
     }
 }

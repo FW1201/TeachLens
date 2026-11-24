@@ -55,6 +55,9 @@ struct KeystrokeEngineConfig: Equatable, Sendable {
     var soloModifierDelay: TimeInterval = 0.35
     /// How long a modifier that was held on its own stays after release.
     var soloModifierLinger: TimeInterval = 1.0
+    /// Keys the teacher added as custom shortcuts; they start a visible
+    /// combination whatever the filter says.
+    var extraKeys: Set<String> = []
 }
 
 struct KeystrokeEngine: Sendable {
@@ -179,6 +182,7 @@ struct KeystrokeEngine: Sendable {
 
     private func ignore(_ pressed: [String]) -> Bool {
         guard let first = pressed.first else { return true }
+        if config.extraKeys.contains(CustomShortcut.normalized(first)) { return false }
         switch config.filter {
         case .none:
             return false

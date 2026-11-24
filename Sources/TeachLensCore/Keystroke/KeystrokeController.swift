@@ -277,8 +277,9 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
 
     private func publish() {
         let all = engine.groups
+        let custom = settings.customShortcuts
         let groups = engine.visibleGroups(at: Self.now()).map { group in
-            KeystrokeDisplayGroup.make(from: group, index: all.firstIndex(of: group) ?? 0)
+            KeystrokeDisplayGroup.make(from: group, index: all.firstIndex(of: group) ?? 0, custom: custom)
         }
         if groups != model.groups {
             model.groups = groups

@@ -211,6 +211,9 @@ TeachLens 沒有 Dock 圖示，執行後在**畫面右上角選單列**出現金
 
 **設定位置**：選單列 ▸ Keystroke Options，或 Settings ▸ Keystrokes（位置、大小、停留秒數、歷史筆數、快捷鍵）。
 
+**自訂快捷鍵**：設定 ▸ 按鍵與游標 ▸「自訂快捷鍵」▸「新增快捷鍵…」，按下想示範的組合（可以是 F5、B 這類單鍵）。每一組可寫說明（例如「筆刷工具」）與 Windows 對照；按下時，膠囊下方會多一個紫色說明標籤，且「只顯示快捷鍵」模式下也一定會顯示。
+
+
 ### 2. Windows 對照
 
 開啟後，每組 Mac 快捷鍵下方會出現藍色的「Windows 建議」對應按鍵，方便同時教 Mac 與 Windows 的學生。這是建議對照，實際快捷鍵可能依軟體而異。對照規則依 Apple 官方說明〈[Mac 上的 Windows 鍵盤對應鍵](https://support.apple.com/zh-hk/guide/mac-help/cpmh0038/mac)〉。
