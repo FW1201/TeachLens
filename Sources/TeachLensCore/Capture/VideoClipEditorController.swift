@@ -53,6 +53,9 @@ final class VideoClipEditorController: NSObject, NSWindowDelegate, VideoTimeline
         var audio: [AVAssetTrack]
         var fullDuration: CMTime
 
+        // MainActor-isolated: on the macOS 15 SDK AVAssetTrack isn't Sendable,
+        // so the result must not cross from a nonisolated context.
+        @MainActor
         static func load(_ asset: AVURLAsset) async -> ClipMedia {
             let duration = (try? await asset.load(.duration)) ?? .zero
             let video = try? await asset.loadTracks(withMediaType: .video).first
