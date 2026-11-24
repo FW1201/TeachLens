@@ -19,6 +19,27 @@ enum TeachingSelfTests {
         try testKeystrokeDemoSequence()
         try testBuildCommitFallback()
         try testShortcutDescriptions()
+        try testGraphicalToolsLayout()
+    }
+
+    private static func testGraphicalToolsLayout() throws {
+        let screen = CGRect(x: 0, y: 25, width: 1440, height: 875)
+        let home = GraphicalToolsLayout.defaultOrigin(in: screen)
+        try expect(home.x + GraphicalToolsLayout.width <= screen.maxX && home.y >= screen.minY,
+                   "The launcher should dock inside the bottom-right corner")
+        let offRight = GraphicalToolsLayout.clampedOrigin(CGPoint(x: 5000, y: -300), in: screen)
+        try expect(offRight.x == screen.maxX - GraphicalToolsLayout.width && offRight.y == screen.minY,
+                   "A launcher dragged off screen should be pulled back inside")
+        let tooHigh = GraphicalToolsLayout.clampedOrigin(CGPoint(x: 100, y: screen.maxY), in: screen)
+        try expect(screen.maxY - tooHigh.y >= GraphicalToolsLayout.minimumRoomAbove,
+                   "The launcher should keep room above it to open the column")
+        try expect(GraphicalToolsLayout.expandedHeight(originY: home.y, in: screen) == GraphicalToolsLayout.maxExpandedHeight,
+                   "On a tall screen the column should open to full height")
+        let short = CGRect(x: 0, y: 0, width: 800, height: 300)
+        let low = GraphicalToolsLayout.clampedOrigin(CGPoint(x: 0, y: 200), in: short)
+        let height = GraphicalToolsLayout.expandedHeight(originY: low.y, in: short)
+        try expect(low.y + height <= short.maxY && height >= GraphicalToolsLayout.collapsedHeight,
+                   "On a short screen the column should stay on screen and scroll")
     }
 
     private static func testLanguageSetting() throws {

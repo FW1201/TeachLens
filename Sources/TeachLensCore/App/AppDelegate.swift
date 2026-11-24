@@ -17,6 +17,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         statusItem = makeStatusItem(controller: appController, courseModes: courseModeController)
         appController.reloadSettingsForLanguageChange()
+        graphicalTools?.languageChanged()
     }
 
     public override init() {
