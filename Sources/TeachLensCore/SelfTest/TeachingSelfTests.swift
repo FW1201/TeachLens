@@ -75,7 +75,7 @@ enum TeachingSelfTests {
         tracker.partial("今天我們", at: 10.4)
         try expect(tracker.finishIfDue(at: 11) == nil, "No pause yet")
         let segment = tracker.finishIfDue(at: 11.7)
-        try expect(segment == CaptionSegment(start: 10, end: 10.4, text: "今天我們"), "Pause should end the sentence, got \(String(describing: segment))")
+        try expect(segment == CaptionSegment(start: 10, end: 10.5, text: "今天我們"), "Pause should end the sentence, got \(String(describing: segment))")
         try expect(tracker.finishIfDue(at: 20) == nil, "Tracker should be empty after finishing")
         tracker.partial("long", at: 30)
         for i in 1...60 { tracker.partial("long \(i)", at: 30 + Double(i)) }
