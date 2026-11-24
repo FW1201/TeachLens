@@ -1,0 +1,45 @@
+name: Build
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # Package.swift uses swift-tools-version 6.0, which needs Xcode 16+.
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Build
+        run: swift build
+
+      - name: Self-test
+        run: swift run TeachLensSelfTest
+
+      - name: Package release app and DMG
+        run: |
+          zsh Scripts/build-app.sh release
+          STAGE="$(mktemp -d)"
+          ditto ".build/TeachLens (Dev).app" "$STAGE/TeachLens (Dev).app"
+          ln -s /Applications "$STAGE/Applications"
+          hdiutil create -volname "TeachLens Dev" -srcfolder "$STAGE" -ov -format UDZO ".build/TeachLens-Dev.dmg"
+          hdiutil verify ".build/TeachLens-Dev.dmg"
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: TeachLens-Dev-dmg
+          path: .build/TeachLens-Dev.dmg
+          if-no-files-found: error
