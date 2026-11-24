@@ -165,26 +165,29 @@ final class ToolSettingsModel: NSObject, ObservableObject {
         // are recorded instead of triggering their action (issue #22).
         onSuspendHotkeys()
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
-            MainActor.assumeIsolated {
-                guard let self else { return event }
-                return self.capture(event)
-            }
+            // Only Sendable values cross into the main-actor call; the event
+            // itself is returned (passed on) or swallowed out here.
+            let keyCode = event.keyCode
+            let flags = event.modifierFlags
+            let consumed = MainActor.assumeIsolated { self?.capture(keyCode: keyCode, flags: flags) ?? false }
+            return consumed ? nil : event
         }
     }
 
-    private func capture(_ event: NSEvent) -> NSEvent? {
-        guard let hotKey = recording else { return event }
-        if event.keyCode == 53 { // Esc cancels.
+    /// Handles a key pressed while recording; returns true when it was used.
+    private func capture(keyCode: UInt16, flags: NSEvent.ModifierFlags) -> Bool {
+        guard let hotKey = recording else { return false }
+        if keyCode == 53 { // Esc cancels.
             finishRecording()
-            return nil
+            return true
         }
-        let modifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
+        let modifiers = flags.intersection([.command, .control, .option, .shift])
         guard !modifiers.isEmpty else {
             // A global hotkey needs at least one modifier.
             NSSound.beep()
-            return nil
+            return true
         }
-        let newCode = Int(event.keyCode)
+        let newCode = Int(keyCode)
         let wanted = HotkeyConflicts.normalized(modifiers.rawValue)
         let own = hotKey.ownNames
         if let clash = HotkeyConflicts.registeredShortcuts(app: settings).first(where: {
@@ -193,12 +196,12 @@ final class ToolSettingsModel: NSObject, ObservableObject {
             NSSound.beep()
             conflict = (hotKey, L10n.t("Already used by \(ShortcutCard.title(for: clash)). Try another.",
                                        "已被「\(ShortcutCard.title(for: clash))」使用，請換一組。"))
-            return nil
+            return true
         }
         set(hotKey, code: newCode, modifiers: modifiers.rawValue)
         finishRecording()
         onHotKeyChange()
-        return nil
+        return true
     }
 
     /// Turns an optional shortcut off.
