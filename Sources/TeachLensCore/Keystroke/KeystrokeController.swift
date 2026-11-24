@@ -192,9 +192,12 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
     }
 
     private func tick() {
-        if engine.tick(at: Self.now()) {
-            publish()
-        }
+        engine.tick(at: Self.now())
+        // Nothing held or shown: skip the work entirely (the common idle case).
+        if engine.groups.isEmpty && model.groups.isEmpty { return }
+        // Visibility also changes without the groups changing (a held modifier
+        // crossing its show delay), so always re-check; publish() skips no-ops.
+        publish()
     }
 
     private static func now() -> TimeInterval {
@@ -205,7 +208,6 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
 
     private func handle(_ input: KeystrokeInput) {
         let now = Self.now()
-        let before = engine.groups
         switch input.kind {
         case .keyDown(let name):
             followPointer(x: input.x, y: input.y)
@@ -225,13 +227,14 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
         case .scroll(let deltaY):
             engine.scroll(deltaY: deltaY, at: now)
         }
-        if engine.groups != before {
-            publish()
-        }
+        publish()
     }
 
     private func publish() {
-        let groups = engine.groups.enumerated().map { KeystrokeDisplayGroup.make(from: $0.element, index: $0.offset) }
+        let all = engine.groups
+        let groups = engine.visibleGroups(at: Self.now()).map { group in
+            KeystrokeDisplayGroup.make(from: group, index: all.firstIndex(of: group) ?? 0)
+        }
         if groups != model.groups {
             model.groups = groups
         }

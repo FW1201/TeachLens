@@ -43,7 +43,7 @@ struct CheckAndTestPane: View {
                         }
                         Spacer()
                         if check.state != .granted {
-                            Button(L10n.t("Fix…", "修正…")) { center.fix(check) }
+                            Button { center.fix(check) } label: { Label(L10n.t("Fix…", "修正…"), systemImage: "wrench.and.screwdriver") }
                         }
                     }
                 }
@@ -108,13 +108,15 @@ struct CheckAndTestPane: View {
                     }
                 }
                 HStack {
-                    Button(L10n.t("Restore previous setup", "回到原本設定")) {
+                    Button {
                         if controllers.courseModes.hasRestorePoint {
                             controllers.courseModes.restoreTestState()
                             results["modes"] = L10n.t("Restored", "已還原")
                         } else {
                             results["modes"] = L10n.t("No previous test setup", "沒有可還原的試用設定")
                         }
+                    } label: {
+                        Label(L10n.t("Restore previous setup", "回到原本設定"), systemImage: "arrow.uturn.backward")
                     }
                     if let result = results["modes"] {
                         Text(result).foregroundStyle(.green).font(.caption)
@@ -153,7 +155,7 @@ struct CheckAndTestPane: View {
             if let result = results[id] {
                 Text(result).font(.caption).foregroundStyle(.secondary)
             }
-            Button(L10n.t("Run", "立即測試")) {
+            Button {
                 results[id] = nil
                 action()
                 // Dispatch is not proof that permissions were granted or that an
@@ -161,6 +163,8 @@ struct CheckAndTestPane: View {
                 if id != "caption" || results[id] != L10n.t("Stop live captions before the demo", "請先停止即時字幕再播放示範") {
                     results[id] = L10n.t("Requested — check the screen", "已送出操作，請確認畫面")
                 }
+            } label: {
+                Label(L10n.t("Run", "立即測試"), systemImage: "play.fill")
             }
         }
     }

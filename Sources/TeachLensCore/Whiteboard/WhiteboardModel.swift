@@ -15,12 +15,31 @@ enum WhiteboardBackground: String, Codable, CaseIterable, Sendable {
         case .lines: return L10n.t("Lines", "橫線")
         }
     }
+
+    var symbol: String {
+        switch self {
+        case .white: return "square"
+        case .black: return "square.fill"
+        case .grid: return "squareshape.split.3x3"
+        case .lines: return "line.3.horizontal"
+        }
+    }
 }
 
 struct WhiteboardColor: Codable, Equatable, Sendable {
     var r: Double, g: Double, b: Double
 
     var cgColor: CGColor { CGColor(red: r, green: g, blue: b, alpha: 1) }
+
+    /// Spoken name, for VoiceOver.
+    var title: String {
+        let names = [
+            L10n.t("Black", "黑"), L10n.t("Red", "紅"), L10n.t("Blue", "藍"), L10n.t("Green", "綠"),
+            L10n.t("Orange", "橘"), L10n.t("Gold", "金"), L10n.t("White", "白"),
+        ]
+        guard let index = Self.palette.firstIndex(of: self), index < names.count else { return L10n.t("Color", "顏色") }
+        return names[index]
+    }
 
     static let palette: [WhiteboardColor] = [
         WhiteboardColor(r: 0.10, g: 0.10, b: 0.12), WhiteboardColor(r: 0.93, g: 0.20, b: 0.20),
@@ -143,17 +162,24 @@ enum WhiteboardRenderer {
         context.setLineCap(.round)
         context.setLineJoin(.round)
         for stroke in page.strokes {
-            guard let first = stroke.points.first else { continue }
-            context.setStrokeColor(stroke.color.cgColor.copy(alpha: stroke.isHighlighter ? 0.35 : 1) ?? stroke.color.cgColor)
-            context.setLineWidth(stroke.width)
-            context.move(to: first)
-            if stroke.points.count == 1 {
-                context.addLine(to: CGPoint(x: first.x + 0.1, y: first.y))
-            }
-            for point in stroke.points.dropFirst() { context.addLine(to: point) }
-            context.strokePath()
+            self.stroke(stroke, in: context)
         }
         context.restoreGState()
+    }
+
+    /// Strokes one line in canvas coordinates; the caller sets round caps.
+    static func stroke(_ stroke: WhiteboardStroke, in context: CGContext) {
+        guard let first = stroke.points.first else { return }
+        context.setStrokeColor(stroke.color.cgColor.copy(alpha: stroke.isHighlighter ? 0.35 : 1) ?? stroke.color.cgColor)
+        context.setLineWidth(stroke.width)
+        context.beginPath()
+        context.move(to: first)
+        if stroke.points.count == 1 {
+            context.addLine(to: CGPoint(x: first.x + 0.1, y: first.y))
+        } else {
+            context.addLines(between: stroke.points)
+        }
+        context.strokePath()
     }
 
     static func aspectFit(_ content: CGSize, in rect: CGRect) -> CGRect {
@@ -196,7 +222,7 @@ enum WhiteboardRenderer {
 }
 
 /// Saves the whiteboard between sessions in Application Support.
-struct WhiteboardStore {
+struct WhiteboardStore: Sendable {
     let url: URL
 
     init(url: URL? = nil) {
