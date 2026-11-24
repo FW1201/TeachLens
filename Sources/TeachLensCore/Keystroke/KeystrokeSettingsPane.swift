@@ -17,35 +17,35 @@ struct KeystrokeSettingsPane: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Show keystrokes on screen", isOn: $draft.enabled)
-                Picker("Show", selection: $draft.filter) {
-                    Text("Shortcuts only").tag(KeystrokeFilter.modifiers)
-                    Text("Every key").tag(KeystrokeFilter.none)
+                Toggle(L10n.t("Show keystrokes on screen", "在畫面上顯示按鍵"), isOn: $draft.enabled)
+                Picker(L10n.t("Show", "顯示"), selection: $draft.filter) {
+                    Text(L10n.t("Shortcuts only", "只顯示快捷鍵")).tag(KeystrokeFilter.modifiers)
+                    Text(L10n.t("Every key", "每個鍵")).tag(KeystrokeFilter.none)
                 }
-                Toggle("Include mouse clicks in shortcuts", isOn: $draft.showMouseEvents)
-                Toggle("Click ripples at the pointer", isOn: $draft.showClickRipples)
+                Toggle(L10n.t("Include mouse clicks in shortcuts", "快捷鍵包含滑鼠點擊"), isOn: $draft.showMouseEvents)
+                Toggle(L10n.t("Click ripples at the pointer", "點擊時顯示漣漪"), isOn: $draft.showClickRipples)
                 Toggle(L10n.t("Show Windows equivalents (Windows 對照)", "開啟 Windows 對照"), isOn: $draft.windowsEquivalent)
-                Toggle("Keep recent shortcuts", isOn: $draft.showHistory)
+                Toggle(L10n.t("Keep recent shortcuts", "保留最近的快捷鍵"), isOn: $draft.showHistory)
                 if draft.showHistory {
-                    Stepper("Recent shortcuts: \(draft.maxHistory)", value: $draft.maxHistory, in: 2...6)
+                    Stepper(L10n.t("Recent shortcuts: \(draft.maxHistory)", "最近快捷鍵：\(draft.maxHistory)"), value: $draft.maxHistory, in: 2...6)
                 }
             }
             Section {
-                Picker("Position", selection: $draft.position) {
+                Picker(L10n.t("Position", "位置"), selection: $draft.position) {
                     ForEach(KeystrokePosition.allCases, id: \.self) { position in
                         Text(position.title).tag(position)
                     }
                 }
-                Picker("Background", selection: $draft.glass) {
+                Picker(L10n.t("Background", "背景"), selection: $draft.glass) {
                     ForEach(KeystrokeGlass.allCases, id: \.self) { glass in
                         Text(glass.title).tag(glass)
                     }
                 }
-                LabeledContent("Size") {
+                LabeledContent(L10n.t("Size", "大小")) {
                     Slider(value: $draft.scale, in: 0.5...3, step: 0.25)
                         .frame(width: 180)
                 }
-                LabeledContent("Stay on screen") {
+                LabeledContent(L10n.t("Stay on screen", "停留時間")) {
                     HStack {
                         Slider(value: $draft.lingerSeconds, in: 1...10, step: 0.5)
                             .frame(width: 140)
@@ -56,9 +56,9 @@ struct KeystrokeSettingsPane: View {
                 }
             }
             Section {
-                LabeledContent("Show/hide shortcut") {
+                LabeledContent(L10n.t("Show/hide shortcut", "開關快捷鍵")) {
                     Button(recorder.isRecording
-                           ? "Press a shortcut…"
+                           ? L10n.t("Press a shortcut…", "請按快捷鍵…")
                            : HotkeyConflicts.displayString(keyCode: draft.toggleKeyCode, modifiers: draft.toggleModifiers)) {
                         if recorder.isRecording {
                             recorder.stop()
@@ -76,16 +76,16 @@ struct KeystrokeSettingsPane: View {
                     app: loadAppSettings(),
                     ignoring: "Show Keystrokes"
                 ) {
-                    Label("Also used by \(conflict). Pick another shortcut.", systemImage: "exclamationmark.triangle.fill")
+                    Label(L10n.t("Also used by \(conflict). Pick another shortcut.", "已被「\(conflict)」使用，請換一組。"), systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
                 }
-                LabeledContent("Input Monitoring") {
+                LabeledContent(L10n.t("Input Monitoring", "輸入監控")) {
                     HStack {
-                        Label(permissionGranted ? "Allowed" : "Not allowed",
+                        Label(permissionGranted ? L10n.t("Allowed", "已允許") : L10n.t("Not allowed", "未允許"),
                               systemImage: permissionGranted ? "checkmark.circle.fill" : "xmark.octagon.fill")
                             .foregroundStyle(permissionGranted ? .green : .red)
                         if !permissionGranted {
-                            Button("Open Settings…") {
+                            Button(L10n.t("Open Settings…", "打開系統設定…")) {
                                 InputMonitoringPermission.request()
                                 InputMonitoringPermission.openSettings()
                             }

@@ -13,21 +13,21 @@ struct SpotlightSettingsPane: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Spotlight around the pointer", isOn: $spotlightOn)
-                Picker("Shape", selection: $draft.shape) {
+                Toggle(L10n.t("Spotlight around the pointer", "游標聚光燈"), isOn: $spotlightOn)
+                Picker(L10n.t("Shape", "形狀"), selection: $draft.shape) {
                     ForEach(SpotlightShape.allCases, id: \.self) { Text($0.title).tag($0) }
                 }
-                LabeledContent("Size") {
+                LabeledContent(L10n.t("Size", "大小")) {
                     Slider(value: $draft.radius, in: SpotlightSettings.radiusRange, step: 10)
                         .frame(width: 200)
                 }
-                LabeledContent("Dimming") {
+                LabeledContent(L10n.t("Dimming", "暗度")) {
                     Slider(value: $draft.dimming, in: SpotlightSettings.dimmingRange, step: 0.05)
                         .frame(width: 200)
                 }
-                LabeledContent("Shortcut") {
+                LabeledContent(L10n.t("Shortcut", "快捷鍵")) {
                     Button(recorder.isRecording
-                           ? "Press a shortcut…"
+                           ? L10n.t("Press a shortcut…", "請按快捷鍵…")
                            : HotkeyConflicts.displayString(keyCode: draft.toggleKeyCode, modifiers: draft.toggleModifiers)) {
                         if recorder.isRecording {
                             recorder.stop()
@@ -45,20 +45,20 @@ struct SpotlightSettingsPane: View {
                     app: loadAppSettings(),
                     ignoring: "Spotlight"
                 ) {
-                    Label("Also used by \(conflict). Pick another shortcut.", systemImage: "exclamationmark.triangle.fill")
+                    Label(L10n.t("Also used by \(conflict). Pick another shortcut.", "已被「\(conflict)」使用，請換一組。"), systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
                 }
             }
             Section {
-                Toggle("Cursor highlight ring", isOn: $draft.highlightEnabled)
-                Picker("Ring color", selection: $draft.highlightColor) {
+                Toggle(L10n.t("Cursor highlight ring", "游標光圈"), isOn: $draft.highlightEnabled)
+                Picker(L10n.t("Ring color", "光圈顏色"), selection: $draft.highlightColor) {
                     ForEach(HighlightColor.allCases, id: \.self) { Text($0.title).tag($0) }
                 }
-                LabeledContent("Ring size") {
+                LabeledContent(L10n.t("Ring size", "光圈大小")) {
                     Slider(value: $draft.highlightDiameter, in: 30...120, step: 2)
                         .frame(width: 200)
                 }
-                Toggle("Shake the mouse to find the cursor", isOn: $draft.shakeToFind)
+                Toggle(L10n.t("Shake the mouse to find the cursor", "搖動滑鼠找游標"), isOn: $draft.shakeToFind)
             }
         }
         .formStyle(.grouped)

@@ -6,12 +6,12 @@ enum KeystrokePosition: String, Codable, CaseIterable, Sendable {
 
     var title: String {
         switch self {
-        case .bottomLeft: return "Bottom Left"
-        case .bottomCenter: return "Bottom Center"
-        case .bottomRight: return "Bottom Right"
-        case .topLeft: return "Top Left"
-        case .topCenter: return "Top Center"
-        case .topRight: return "Top Right"
+        case .bottomLeft: return L10n.t("Bottom Left", "左下")
+        case .bottomCenter: return L10n.t("Bottom Center", "中下")
+        case .bottomRight: return L10n.t("Bottom Right", "右下")
+        case .topLeft: return L10n.t("Top Left", "左上")
+        case .topCenter: return L10n.t("Top Center", "中上")
+        case .topRight: return L10n.t("Top Right", "右上")
         }
     }
 
@@ -29,9 +29,9 @@ enum KeystrokeGlass: String, Codable, CaseIterable, Sendable {
 
     var title: String {
         switch self {
-        case .automatic: return "Liquid Glass (macOS 26+)"
-        case .frosted: return "Frosted"
-        case .solid: return "Solid"
+        case .automatic: return L10n.t("Liquid Glass (macOS 26+)", "Liquid Glass（macOS 26 以上）")
+        case .frosted: return L10n.t("Frosted", "霧面")
+        case .solid: return L10n.t("Solid", "實色")
         }
     }
 }

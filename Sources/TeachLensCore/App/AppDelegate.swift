@@ -203,7 +203,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             let toggleItem = menu.items[index]
             toggleItem.target = controller.keystrokeController
             toggleItem.action = #selector(KeystrokeController.toggle)
-            let optionsItem = NSMenuItem(title: "Keystroke Options", action: nil, keyEquivalent: "")
+            let optionsItem = NSMenuItem(title: L10n.t("Keystroke Options", "按鍵顯示選項"), action: nil, keyEquivalent: "")
             optionsItem.submenu = controller.keystrokeController.makeMenu()
             menu.insertItem(optionsItem, at: index + 1)
         }
@@ -230,7 +230,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             let toggleItem = menu.items[index]
             toggleItem.target = controller.spotlightController
             toggleItem.action = #selector(SpotlightController.toggleSpotlight)
-            let optionsItem = NSMenuItem(title: "Spotlight Options", action: nil, keyEquivalent: "")
+            let optionsItem = NSMenuItem(title: L10n.t("Spotlight Options", "聚光燈選項"), action: nil, keyEquivalent: "")
             optionsItem.submenu = controller.spotlightController.makeMenu()
             menu.insertItem(optionsItem, at: index + 1)
         }
@@ -271,10 +271,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             StatusMenuEntry(title: "Panorama Capture", action: #selector(AppController.startPanorama), keyEquivalent: ""),
             StatusMenuEntry(title: "DemoMirror", action: #selector(AppController.toggleDemoMirror), keyEquivalent: ""),
             StatusMenuEntry(title: "Break Timer", action: #selector(AppController.toggleBreakTimer), keyEquivalent: ""),
-            StatusMenuEntry(title: "Show Keystrokes", action: #selector(AppController.toggleKeystrokes), keyEquivalent: ""),
-            StatusMenuEntry(title: "Spotlight", action: #selector(AppController.toggleSpotlight), keyEquivalent: ""),
-            StatusMenuEntry(title: "Live Captions", action: #selector(AppController.toggleCaptions), keyEquivalent: ""),
-            StatusMenuEntry(title: "Whiteboard", action: #selector(AppController.toggleWhiteboard), keyEquivalent: ""),
+            StatusMenuEntry(title: L10n.t("Show Keystrokes", "顯示按鍵"), action: #selector(AppController.toggleKeystrokes), keyEquivalent: ""),
+            StatusMenuEntry(title: L10n.t("Spotlight", "聚光燈"), action: #selector(AppController.toggleSpotlight), keyEquivalent: ""),
+            StatusMenuEntry(title: L10n.t("Live Captions", "即時字幕"), action: #selector(AppController.toggleCaptions), keyEquivalent: ""),
+            StatusMenuEntry(title: L10n.t("Whiteboard", "白板"), action: #selector(AppController.toggleWhiteboard), keyEquivalent: ""),
             .separator,
             StatusMenuEntry(title: "Check Permissions", action: #selector(AppController.checkPermissions), keyEquivalent: ""),
             StatusMenuEntry(title: "Quit", action: #selector(AppController.quit), keyEquivalent: "q")

@@ -47,13 +47,20 @@ struct SpotlightSettings: Codable, Equatable, Sendable {
 enum SpotlightShape: String, Codable, CaseIterable, Sendable {
     case circle, bar
 
-    var title: String { self == .circle ? "Circle" : "Wide Bar" }
+    var title: String { self == .circle ? L10n.t("Circle", "圓形") : L10n.t("Wide Bar", "寬條") }
 }
 
 enum HighlightColor: String, Codable, CaseIterable, Sendable {
     case yellow, cyan, pink, green
 
-    var title: String { rawValue.capitalized }
+    var title: String {
+        switch self {
+        case .yellow: return L10n.t("Yellow", "黃")
+        case .cyan: return L10n.t("Cyan", "青")
+        case .pink: return L10n.t("Pink", "粉紅")
+        case .green: return L10n.t("Green", "綠")
+        }
+    }
 
     var nsColor: NSColor {
         switch self {
@@ -355,16 +362,16 @@ final class SpotlightController: NSObject, NSMenuItemValidation {
             item.representedObject = represented
             menu.addItem(item)
         }
-        add("Cursor Highlight", #selector(toggleHighlight))
-        add("Shake to Find Cursor", #selector(toggleShake))
+        add(L10n.t("Cursor Highlight", "游標光圈"), #selector(toggleHighlight))
+        add(L10n.t("Shake to Find Cursor", "搖動找游標"), #selector(toggleShake))
         menu.addItem(.separator())
         for shape in SpotlightShape.allCases {
             add(shape.title, #selector(setShape(_:)), shape.rawValue)
         }
-        add("Larger Spotlight", #selector(largerSpotlight))
-        add("Smaller Spotlight", #selector(smallerSpotlight))
-        add("Darker", #selector(darker))
-        add("Lighter", #selector(lighter))
+        add(L10n.t("Larger Spotlight", "放大聚光燈"), #selector(largerSpotlight))
+        add(L10n.t("Smaller Spotlight", "縮小聚光燈"), #selector(smallerSpotlight))
+        add(L10n.t("Darker", "更暗"), #selector(darker))
+        add(L10n.t("Lighter", "更亮"), #selector(lighter))
         menu.addItem(.separator())
         for color in HighlightColor.allCases {
             add(color.title, #selector(setColor(_:)), color.rawValue)

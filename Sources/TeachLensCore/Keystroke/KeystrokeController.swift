@@ -305,10 +305,10 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
             item.representedObject = represented
             menu.addItem(item)
         }
-        add("Shortcuts Only", #selector(toggleShortcutsOnly))
-        add("Show Mouse Clicks", #selector(toggleMouseEvents))
-        add("Click Ripples", #selector(toggleClickRipples))
-        add("Keep History", #selector(toggleHistory))
+        add(L10n.t("Shortcuts Only", "只顯示快捷鍵"), #selector(toggleShortcutsOnly))
+        add(L10n.t("Show Mouse Clicks", "顯示滑鼠點擊"), #selector(toggleMouseEvents))
+        add(L10n.t("Click Ripples", "點擊漣漪"), #selector(toggleClickRipples))
+        add(L10n.t("Keep History", "保留歷史"), #selector(toggleHistory))
         add(L10n.t("Windows Equivalents", "Windows 對照"), #selector(toggleWindowsEquivalent))
         menu.addItem(.separator())
         for position in KeystrokePosition.allCases {
@@ -319,8 +319,8 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
             add(glass.title, #selector(setGlass(_:)), glass.rawValue)
         }
         menu.addItem(.separator())
-        add("Larger", #selector(increaseScale))
-        add("Smaller", #selector(decreaseScale))
+        add(L10n.t("Larger", "放大"), #selector(increaseScale))
+        add(L10n.t("Smaller", "縮小"), #selector(decreaseScale))
         return menu
     }
 
