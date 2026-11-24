@@ -92,8 +92,9 @@ jobs:
           body: |
             ## 下載與安裝
             1. 下載 `TeachLens-${{ steps.version.outputs.version }}.dmg`，打開後把 TeachLens 拖到「應用程式」。
-            2. 此版本未經 Apple 公證，第一次開啟請在 App 上按右鍵 ▸「打開」，或在終端機執行：
+            2. 此版本未經 Apple 公證，第一次開啟會被擋下。請先雙擊一次，再到「系統設定 ▸ 隱私權與安全性」按 TeachLens 旁的「強制打開」；或在終端機執行：
                `xattr -dr com.apple.quarantine /Applications/TeachLens.app`
+               （macOS 15 以後「右鍵 ▸ 打開」已無法略過，macOS 14 仍可用。）
             3. 依提示開啟「螢幕錄製」「輸入監控」「麥克風」「語音辨識」權限。
 
             需要 macOS 14 以上；macOS 26 以上會顯示 Liquid Glass 樣式。
