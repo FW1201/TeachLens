@@ -70,6 +70,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         modeCoordinator.onToggleKeystrokes = { [weak keystrokeController] in
             keystrokeController?.toggle()
         }
+        modeCoordinator.additionalCaptureExclusions = { [weak keystrokeController] in
+            keystrokeController?.windowNumberForCaptureExclusion.map { [$0] } ?? []
+        }
+        modeCoordinator.keystrokeFrameProvider = { [weak keystrokeController] in
+            keystrokeController?.recordingFrame()
+        }
 
         appController = AppController(
             settingsStore: settingsStore,

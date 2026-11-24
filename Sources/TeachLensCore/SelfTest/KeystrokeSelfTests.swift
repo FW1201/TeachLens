@@ -21,6 +21,8 @@ enum KeystrokeSelfTests {
         try testSettingsRoundTripAndDefaults()
         try testSettingsDecodeToleratesMissingKeys()
         try testKeystrokeDefaultHotkeyDoesNotCollideWithZoomIt()
+        try testHotkeyConflictDetection()
+        try testRecordingCompositePlacesHUD()
     }
 
     private static func expect(_ condition: Bool, _ message: String) throws {
@@ -217,5 +219,55 @@ enum KeystrokeSelfTests {
             try expect(!(code == keystroke.toggleKeyCode && modifiers == keystroke.toggleModifiers),
                        "Control+0 collides with an existing default hotkey")
         }
+    }
+
+    private static func testHotkeyConflictDetection() throws {
+        let app = AppSettings.defaults
+        let control = NSEvent.ModifierFlags.control.rawValue
+        let shift = NSEvent.ModifierFlags.shift.rawValue
+        try expect(HotkeyConflicts.conflict(keyCode: kVK_ANSI_0, modifiers: control, app: app) == nil,
+                   "Control+0 should be free")
+        try expect(HotkeyConflicts.conflict(keyCode: app.hotKeyCode, modifiers: app.hotKeyModifiers, app: app) == "Static Zoom",
+                   "The zoom shortcut should be reported as taken")
+        try expect(HotkeyConflicts.conflict(keyCode: app.recordHotKeyCode, modifiers: app.recordHotKeyModifiers | shift, app: app) == "Record Region",
+                   "Derived Shift variants should be checked too")
+        try expect(HotkeyConflicts.displayString(keyCode: kVK_ANSI_0, modifiers: control) == "⌃0",
+                   "Expected ⌃0, got \(HotkeyConflicts.displayString(keyCode: kVK_ANSI_0, modifiers: control))")
+    }
+
+    /// The HUD image must land where it sits on screen when composited into an
+    /// overlay-rendered recording frame.
+    private static func testRecordingCompositePlacesHUD() throws {
+        let display = DisplayDescriptor(id: 1, frame: CGRect(x: 0, y: 0, width: 100, height: 80), scaleFactor: 1)
+        func solid(_ width: Int, _ height: Int, _ rgba: (UInt8, UInt8, UInt8, UInt8)) throws -> CGImage {
+            var pixels = [UInt8](repeating: 0, count: width * height * 4)
+            for i in stride(from: 0, to: pixels.count, by: 4) {
+                pixels[i] = rgba.0; pixels[i + 1] = rgba.1; pixels[i + 2] = rgba.2; pixels[i + 3] = rgba.3
+            }
+            guard let provider = CGDataProvider(data: Data(pixels) as CFData),
+                  let image = CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32,
+                                      bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+                                      provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent) else {
+                throw SelfTestError.failure("Could not build test image")
+            }
+            return image
+        }
+        let base = try solid(100, 80, (0, 0, 0, 255))
+        let hud = try solid(20, 10, (255, 255, 255, 255))
+        // Bottom-left corner of the screen in AppKit coordinates (origin bottom-left).
+        let frame = KeystrokeRecordingFrame(image: hud, frame: CGRect(x: 10, y: 5, width: 20, height: 10))
+        let out = RecordingController.composite(frame, over: base, display: display, sourceRect: nil)
+        guard let data = out.dataProvider?.data, let bytes = CFDataGetBytePtr(data) else {
+            throw SelfTestError.failure("Could not read composited image")
+        }
+        func brightness(x: Int, yFromTop: Int) -> Int {
+            let offset = yFromTop * out.bytesPerRow + x * 4
+            return Int(bytes[offset]) + Int(bytes[offset + 1]) + Int(bytes[offset + 2])
+        }
+        // Image rows run top to bottom: the HUD covers rows 65..<75 and columns 10..<30.
+        try expect(brightness(x: 20, yFromTop: 70) > 600, "HUD should be drawn near the bottom-left")
+        try expect(brightness(x: 20, yFromTop: 10) < 30, "Top of the frame should stay untouched")
+        try expect(brightness(x: 60, yFromTop: 70) < 30, "Area right of the HUD should stay untouched")
     }
 }

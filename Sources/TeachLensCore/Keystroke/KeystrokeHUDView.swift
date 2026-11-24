@@ -84,15 +84,7 @@ struct KeystrokeHUDView: View {
             ZStack(alignment: Self.frameAlignment(settings.position)) {
                 Color.clear
                 KeystrokeGlassContainer(glass: settings.glass, spacing: 8 * s) {
-                    VStack(alignment: Self.stackAlignment(settings.position), spacing: 8 * s) {
-                        ForEach(Array(model.groups.enumerated()), id: \.element.id) { index, group in
-                            let isOld = index < model.groups.count - 1
-                            KeystrokePillView(group: group, scale: s, glass: settings.glass)
-                                .opacity(isOld ? 0.55 : 1)
-                                .scaleEffect(isOld ? 0.86 : 1, anchor: Self.scaleAnchor(settings.position))
-                                .transition(.scale(scale: 0.85).combined(with: .opacity))
-                        }
-                    }
+                    KeystrokeStackView(groups: model.groups, position: settings.position, scale: s, glass: settings.glass)
                 }
                 .padding(CGFloat(settings.margin))
             }
@@ -136,6 +128,33 @@ struct KeystrokeHUDView: View {
         case .topRight: return .topTrailing
         }
     }
+}
+
+/// The column of combination pills; newest at the end, older ones faded.
+struct KeystrokeStackView: View {
+    let groups: [KeystrokeDisplayGroup]
+    let position: KeystrokePosition
+    let scale: CGFloat
+    let glass: KeystrokeGlass
+
+    var body: some View {
+        VStack(alignment: KeystrokeHUDView.stackAlignment(position), spacing: 8 * scale) {
+            ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
+                let isOld = index < groups.count - 1
+                KeystrokePillView(group: group, scale: scale, glass: glass)
+                    .opacity(isOld ? 0.55 : 1)
+                    .scaleEffect(isOld ? 0.86 : 1, anchor: KeystrokeHUDView.scaleAnchor(position))
+                    .transition(.scale(scale: 0.85).combined(with: .opacity))
+            }
+        }
+    }
+}
+
+/// The keystroke HUD as an image plus its on-screen frame (global AppKit
+/// coordinates, points), for compositing into recorded frames.
+struct KeystrokeRecordingFrame: @unchecked Sendable {
+    let image: CGImage
+    let frame: CGRect
 }
 
 struct KeystrokePillView: View {

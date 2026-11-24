@@ -43,24 +43,29 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
     }
 
     @objc func toggle() {
-        settings.enabled.toggle()
-        store.save(settings)
-        if settings.enabled {
-            didShowPermissionHint = false
-            activate(promptForPermission: true)
-        } else {
-            deactivate()
-        }
+        update { $0.enabled.toggle() }
     }
 
+    /// The overlay's observable state, for the Settings pane.
+    var observableModel: KeystrokeOverlayModel { model }
+
     func update(_ change: (inout KeystrokeSettings) -> Void) {
-        let oldHotkey = (settings.toggleKeyCode, settings.toggleModifiers)
+        let old = settings
         change(&settings)
+        guard settings != old else { return }
         store.save(settings)
         engine.config = settings.engineConfig
         model.settings = settings
         publish()
-        if oldHotkey != (settings.toggleKeyCode, settings.toggleModifiers) {
+        if old.enabled != settings.enabled {
+            if settings.enabled {
+                didShowPermissionHint = false
+                activate(promptForPermission: true)
+            } else {
+                deactivate()
+            }
+        }
+        if old.toggleKeyCode != settings.toggleKeyCode || old.toggleModifiers != settings.toggleModifiers {
             onHotkeyChange?()
         }
     }
@@ -230,6 +235,50 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
         screenFrame = Self.cgFrame(of: screen)
         panel?.setFrame(screen.frame, display: true)
         panel?.orderFrontRegardless()
+    }
+
+    // MARK: Capture coordination
+
+    /// The HUD window, to keep it out of zoom source captures.
+    var windowNumberForCaptureExclusion: Int? {
+        guard let panel, panel.isVisible else { return nil }
+        return panel.windowNumber
+    }
+
+    private var cachedRecordingFrame: KeystrokeRecordingFrame?
+    private var cachedRecordingKey: (groups: [KeystrokeDisplayGroup], settings: KeystrokeSettings, screen: CGRect)?
+
+    /// Renders the current combinations for recordings made while a zoom or
+    /// draw overlay is up. Rendered with the opaque style (glass cannot be
+    /// rasterized off-screen) and cached until the combinations change.
+    func recordingFrame() -> KeystrokeRecordingFrame? {
+        guard isActive, let panel, !model.groups.isEmpty else { return nil }
+        let screen = panel.frame
+        if let key = cachedRecordingKey, key.groups == model.groups, key.settings == settings, key.screen == screen {
+            return cachedRecordingFrame
+        }
+        let s = CGFloat(min(max(settings.scale, 0.5), 3))
+        let view = KeystrokeStackView(groups: model.groups, position: settings.position, scale: s, glass: .solid)
+            .padding(16 * s)
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = panel.backingScaleFactor
+        guard let image = renderer.cgImage else { return nil }
+        let size = CGSize(
+            width: CGFloat(image.width) / renderer.scale,
+            height: CGFloat(image.height) / renderer.scale
+        )
+        let margin = CGFloat(settings.margin) - 16 * s
+        let x: CGFloat
+        switch settings.position {
+        case .bottomLeft, .topLeft: x = screen.minX + margin
+        case .bottomCenter, .topCenter: x = screen.midX - size.width / 2
+        case .bottomRight, .topRight: x = screen.maxX - margin - size.width
+        }
+        let y = settings.position.isTop ? screen.maxY - margin - size.height : screen.minY + margin
+        let frame = KeystrokeRecordingFrame(image: image, frame: CGRect(origin: CGPoint(x: x, y: y), size: size))
+        cachedRecordingFrame = frame
+        cachedRecordingKey = (model.groups, settings, screen)
+        return frame
     }
 
     // MARK: Menu

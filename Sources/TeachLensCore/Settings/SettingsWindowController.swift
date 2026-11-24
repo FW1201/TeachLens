@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import UniformTypeIdentifiers
 
 @MainActor
@@ -31,6 +32,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
     private let onOpenTrimEditor: () -> Void
     private let userSelectedResourceAccess: UserSelectedResourceAccess
     private var settings: AppSettings
+    private let keystrokeController: KeystrokeController?
 
     private static let homepageURLString = "https://github.com/FW1201/keyviz-for-Mac"
     private static let contentWidth: CGFloat = 540
@@ -123,8 +125,10 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         onRequestSpeechRecognition: @escaping () -> Void,
         onRequestCamera: @escaping () -> Void,
         onOpenTrimEditor: @escaping () -> Void,
-        userSelectedResourceAccess: UserSelectedResourceAccess
+        userSelectedResourceAccess: UserSelectedResourceAccess,
+        keystrokeController: KeystrokeController? = nil
     ) {
+        self.keystrokeController = keystrokeController
         self.settingsStore = settingsStore
         self.onHotKeyChange = onHotKeyChange
         self.onSuspendHotkeys = onSuspendHotkeys
@@ -176,7 +180,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
     /// The Options dialog tabs, in order. Zoom and Live Zoom are separate tabs
     /// (matching Windows ZoomIt, whose Zoom tab holds static-zoom settings only).
     static var settingsTabTitles: [String] {
-        var titles = ["General", "Zoom", "Live Zoom", "Draw", "Type"]
+        var titles = ["General", "Keystrokes", "Zoom", "Live Zoom", "Draw", "Type"]
         #if !TEACHLENS_APP_STORE
         titles.append("DemoType")
         #endif
@@ -187,6 +191,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
     private func viewForTab(_ title: String) -> NSView {
         switch title {
         case "General": return makeGeneralTab()
+        case "Keystrokes": return makeKeystrokesTab()
         case "Zoom": return makeZoomTab()
         case "Live Zoom": return makeLiveZoomTab()
         case "Draw": return makeDrawTab()
@@ -392,6 +397,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
     static func paneSymbolName(for title: String) -> String {
         switch title {
         case "General": return "gearshape"
+        case "Keystrokes": return "command"
         case "Zoom": return "plus.magnifyingglass"
         case "Live Zoom": return "magnifyingglass.circle"
         case "Draw": return "pencil.tip"
@@ -632,6 +638,20 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
             alert.addButton(withTitle: "OK")
             alert.runModal()
         }
+    }
+
+    // MARK: - Keystrokes tab (TeachLens)
+
+    private func makeKeystrokesTab() -> NSView {
+        guard let keystrokeController else { return NSView() }
+        let store = settingsStore
+        let pane = KeystrokeSettingsPane(
+            model: keystrokeController.observableModel,
+            controller: keystrokeController,
+            loadAppSettings: { store.load() }
+        )
+        .frame(width: Self.contentWidth, height: 460)
+        return NSHostingView(rootView: pane)
     }
 
     // MARK: - Zoom tab

@@ -20,7 +20,8 @@ final class AppController: NSObject {
         onRequestSpeechRecognition: { [weak self] in self?.requestSnipDictationPermissions() },
         onRequestCamera: { [weak self] in self?.permissionService.requestCameraAccess(completion: nil) },
         onOpenTrimEditor: { [weak self] in self?.modeCoordinator.openTrimEditor() },
-        userSelectedResourceAccess: userSelectedResourceAccess
+        userSelectedResourceAccess: userSelectedResourceAccess,
+        keystrokeController: keystrokeController
     )
 
     init(

@@ -65,6 +65,13 @@ final class ModeCoordinator {
     var onEndLiveZoomNavigation: (() -> Void)?
     /// Toggles the keystroke overlay (owned by KeystrokeController).
     var onToggleKeystrokes: (() -> Void)?
+    /// Extra TeachLens windows (the keystroke HUD) to keep out of the zoom
+    /// source capture, so they are not frozen into or magnified by zoom.
+    var additionalCaptureExclusions: (() -> [Int])?
+    /// Supplies the keystroke HUD to recordings made while an overlay is up.
+    var keystrokeFrameProvider: (@MainActor @Sendable () -> KeystrokeRecordingFrame?)? {
+        didSet { recordingController.keystrokeFrameProvider = keystrokeFrameProvider }
+    }
 
     init(
         settingsStore: SettingsStore,
@@ -290,7 +297,7 @@ final class ModeCoordinator {
                 let excludedWindowNumbers = [
                     overlayController.overlayWindowNumber,
                     recordingController.webcamWindowNumberForScreenCaptureExclusion
-                ].compactMap { $0 }
+                ].compactMap { $0 } + (additionalCaptureExclusions?() ?? [])
                 try await session.start(display: display, excludingWindowNumbers: excludedWindowNumbers)
 
                 // Enable Control+Up/Down zoom while live zoom is on screen.
@@ -404,7 +411,8 @@ final class ModeCoordinator {
     }
 
     private func captureDisplayForOverlay(_ display: DisplayDescriptor) async throws -> CapturedFrame {
-        let excludedWindowNumbers = recordingController.webcamWindowNumberForScreenCaptureExclusion.map { [$0] } ?? []
+        let excludedWindowNumbers = (recordingController.webcamWindowNumberForScreenCaptureExclusion.map { [$0] } ?? [])
+            + (additionalCaptureExclusions?() ?? [])
         return try await captureService.captureDisplay(display, excludingWindowNumbers: excludedWindowNumbers)
     }
 

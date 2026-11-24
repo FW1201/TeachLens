@@ -725,6 +725,9 @@ final class RecordingController {
     private let sampleQueue = DispatchQueue(label: "com.teachlens.recorder.samples")
     private var clipEditor: VideoClipEditorController?
     var overlayFrameProvider: (@MainActor @Sendable (CGRect?) -> CGImage?)?
+    /// Supplies the keystroke HUD so it is drawn into overlay-composited
+    /// frames (zoom/draw modes), where the screen itself is not captured.
+    var keystrokeFrameProvider: (@MainActor @Sendable () -> KeystrokeRecordingFrame?)?
 
     init(
         captureService: ScreenCaptureService,
@@ -916,8 +919,14 @@ final class RecordingController {
         let output = RecordingStreamOutput(engine: engine, overlayFrameProvider: overlayFrameProvider.map { provider in
             { @MainActor @Sendable in
                 guard let overlayImage = provider(sourceRect) else { return nil }
-                guard let webcamFrame = self.webcam.recordingSnapshot() else { return overlayImage }
-                return self.composite(webcamFrame, over: overlayImage, display: display, sourceRect: sourceRect)
+                var image = overlayImage
+                if let webcamFrame = self.webcam.recordingSnapshot() {
+                    image = self.composite(webcamFrame, over: image, display: display, sourceRect: sourceRect)
+                }
+                if let keystrokes = self.keystrokeFrameProvider?() {
+                    image = Self.composite(keystrokes, over: image, display: display, sourceRect: sourceRect)
+                }
+                return image
             }
         })
         try stream.addStreamOutput(output, type: .screen, sampleHandlerQueue: sampleQueue)
@@ -932,6 +941,42 @@ final class RecordingController {
         }
 
         try await stream.startCapture()
+    }
+
+    /// Draws the keystroke HUD image at its on-screen frame (global AppKit
+    /// coordinates) into a recorded frame of `display`/`sourceRect`.
+    static func composite(_ keystrokes: KeystrokeRecordingFrame, over base: CGImage, display: DisplayDescriptor, sourceRect: CGRect?) -> CGImage {
+        let width = base.width
+        let height = base.height
+        let bitmapInfo = CGBitmapInfo.byteOrder32Little.rawValue | CGImageAlphaInfo.premultipliedFirst.rawValue
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: bitmapInfo
+        ) else { return base }
+
+        let bounds = CGRect(x: 0, y: 0, width: width, height: height)
+        context.interpolationQuality = .high
+        context.draw(base, in: bounds)
+
+        let scale = CGFloat(width) / (sourceRect?.width ?? display.frame.width)
+        let source = sourceRect ?? CGRect(origin: .zero, size: display.frame.size)
+        let frame = keystrokes.frame
+        let x = (frame.minX - display.frame.minX - source.minX) * scale
+        let topY = (display.frame.maxY - frame.maxY - source.minY) * scale
+        let drawRect = CGRect(
+            x: x,
+            y: CGFloat(height) - topY - frame.height * scale,
+            width: frame.width * scale,
+            height: frame.height * scale
+        ).integral
+        guard drawRect.intersects(bounds) else { return base }
+        context.draw(keystrokes.image, in: drawRect)
+        return context.makeImage() ?? base
     }
 
     private func composite(_ webcamFrame: WebcamRecordingFrame, over overlayImage: CGImage, display: DisplayDescriptor, sourceRect: CGRect?) -> CGImage {
