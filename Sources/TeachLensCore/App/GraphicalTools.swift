@@ -257,9 +257,6 @@ final class GraphicalTools: ObservableObject {
 // MARK: - Views
 
 private struct GraphicalToolsView: View {
-    @ObservedObject // MARK: - Views
-
-private struct GraphicalToolsView: View {
     @ObservedObject var tools: GraphicalTools
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -427,7 +424,10 @@ private struct GraphicalToolsView: View {
     }
 }
 
-() -> Void)?
+// MARK: - Panel
+
+private final class ToolsPanel: NSPanel {
+    var onDismiss: (() -> Void)?
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
