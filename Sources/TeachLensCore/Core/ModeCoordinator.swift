@@ -11,7 +11,14 @@ final class ModeCoordinator {
     private let viewportController: ZoomViewportController
     private let userSelectedResourceAccess: UserSelectedResourceAccess
 
-    private(set) var mode: AppMode = .idle
+    private(set) var mode: AppMode = .idle {
+        didSet { notifyToolsVisibility() }
+    }
+    var onToolsCaptureActivityChanged: ((Bool) -> Void)?
+
+    private func notifyToolsVisibility() {
+        onToolsCaptureActivityChanged?(isSnipping || (mode != .idle && mode != .recording))
+    }
     private var isExiting = false
     /// The mode to restore when leaving typing mode (zoom vs. draw-without-zoom).
     private var modeBeforeTyping: AppMode = .staticZoom
@@ -25,7 +32,7 @@ final class ModeCoordinator {
         settingsStore: settingsStore,
         userSelectedResourceAccess: userSelectedResourceAccess
     )
-    private var isSnipping = false
+    private var isSnipping = false { didSet { notifyToolsVisibility() } }
     /// Drives screen recording (Control+5 / Control+Shift+5).
     private lazy var recordingController = RecordingController(
         captureService: captureService,
