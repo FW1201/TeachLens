@@ -18,6 +18,26 @@ enum KeystrokePosition: String, Codable, CaseIterable, Sendable {
     var isTop: Bool { self == .topLeft || self == .topCenter || self == .topRight }
 }
 
+/// Which system's shortcut the main pill shows. The other one, when
+/// "Windows 對照" is on, appears as a smaller line under it.
+enum KeystrokePlatform: String, Codable, CaseIterable, Sendable {
+    case mac, windows
+
+    var title: String {
+        switch self {
+        case .mac: return L10n.t("Mac first, Windows below", "Mac 為主、Windows 為輔")
+        case .windows: return L10n.t("Windows first, Mac below", "Windows 為主、Mac 為輔")
+        }
+    }
+
+    var shortTitle: String {
+        switch self {
+        case .mac: return "Mac"
+        case .windows: return "Windows"
+        }
+    }
+}
+
 /// How the pill's background is drawn.
 enum KeystrokeGlass: String, Codable, CaseIterable, Sendable {
     /// Liquid Glass on macOS 26 and later, frosted material before that.
@@ -56,6 +76,8 @@ struct KeystrokeSettings: Codable, Equatable, Sendable {
     var margin: Double = 64
     /// Show the Windows equivalent under each combination ("Windows 對照").
     var windowsEquivalent = false
+    /// Show the Windows shortcut in the main pill and the Mac one below it.
+    var primaryPlatform: KeystrokePlatform = .mac
     /// Global toggle hotkey: virtual key code and NSEvent modifier raw value.
     /// Defaults to Control+0 (ZoomIt uses Control+1 … Control+9).
     var toggleKeyCode = 29
@@ -78,7 +100,7 @@ struct KeystrokeSettings: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case enabled, filter, allowedKeys, showHistory, maxHistory, showMouseEvents, showClickRipples
         case lingerSeconds, dragThreshold, position, glass, scale, margin, toggleKeyCode, toggleModifiers
-        case windowsEquivalent
+        case windowsEquivalent, primaryPlatform
     }
 
     init(from decoder: Decoder) throws {
@@ -98,6 +120,7 @@ struct KeystrokeSettings: Codable, Equatable, Sendable {
         scale = try c.decodeIfPresent(Double.self, forKey: .scale) ?? d.scale
         margin = try c.decodeIfPresent(Double.self, forKey: .margin) ?? d.margin
         windowsEquivalent = try c.decodeIfPresent(Bool.self, forKey: .windowsEquivalent) ?? d.windowsEquivalent
+        primaryPlatform = (try? c.decodeIfPresent(KeystrokePlatform.self, forKey: .primaryPlatform)) ?? d.primaryPlatform
         toggleKeyCode = try c.decodeIfPresent(Int.self, forKey: .toggleKeyCode) ?? d.toggleKeyCode
         toggleModifiers = try c.decodeIfPresent(UInt.self, forKey: .toggleModifiers) ?? d.toggleModifiers
     }

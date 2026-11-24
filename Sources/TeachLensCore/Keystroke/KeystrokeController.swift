@@ -327,7 +327,7 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
         }
         let s = CGFloat(min(max(settings.scale, 0.5), 3))
         let view = KeystrokeStackView(groups: model.groups, position: settings.position, scale: s, glass: .solid,
-                                      showWindows: settings.windowsEquivalent)
+                                      showWindows: settings.windowsEquivalent, primary: settings.primaryPlatform)
             .padding(16 * s)
         let renderer = ImageRenderer(content: view)
         renderer.scale = panel.backingScaleFactor
@@ -365,6 +365,10 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
         add(L10n.t("Click Ripples", "點擊漣漪"), #selector(toggleClickRipples))
         add(L10n.t("Keep History", "保留歷史"), #selector(toggleHistory))
         add(L10n.t("Windows Equivalents", "Windows 對照"), #selector(toggleWindowsEquivalent))
+        menu.addItem(.separator())
+        for platform in KeystrokePlatform.allCases {
+            add(platform.title, #selector(setPrimaryPlatform(_:)), platform.rawValue)
+        }
         menu.addItem(.separator())
         for position in KeystrokePosition.allCases {
             add(position.title, #selector(setPosition(_:)), position.rawValue)
@@ -412,6 +416,12 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
         update { $0.windowsEquivalent.toggle() }
     }
 
+    @objc private func setPrimaryPlatform(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String,
+              let platform = KeystrokePlatform(rawValue: raw) else { return }
+        update { $0.primaryPlatform = platform }
+    }
+
     @objc private func toggleHistory() {
         update { $0.showHistory.toggle() }
         engine.clearGroups()
@@ -451,6 +461,8 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
             menuItem.state = settings.showHistory ? .on : .off
         case #selector(toggleWindowsEquivalent):
             menuItem.state = settings.windowsEquivalent ? .on : .off
+        case #selector(setPrimaryPlatform(_:)):
+            menuItem.state = (menuItem.representedObject as? String) == settings.primaryPlatform.rawValue ? .on : .off
         case #selector(setPosition(_:)):
             menuItem.state = raw == settings.position.rawValue ? .on : .off
         case #selector(setGlass(_:)):

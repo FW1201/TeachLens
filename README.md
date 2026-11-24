@@ -203,6 +203,17 @@ TeachLens 沒有 Dock 圖示，執行後在**畫面右上角選單列**出現金
 
 **開啟方式**：選單列 ▸ Keystroke Options ▸ **Windows 對照**，或 Settings ▸ Keystrokes ▸ 開啟 Windows 對照。
 
+**以 Windows 為主**：學生大多用 Windows 時，可把主要顯示改成 Windows。
+
+| 主要顯示 | 膠囊顯示 | 下方對照（需開啟對照） |
+|---|---|---|
+| Mac（預設） | ⌘C | 藍色「Windows 建議 Ctrl + C」 |
+| Windows | Ctrl + C | 灰色「Mac ⌘C」 |
+
+- 一般字母、數字在兩個系統相同，所以不論主要顯示選哪一個，都照原樣顯示。
+- 改成 Windows 為主時，就算沒開對照也會生效；開啟對照後，下方才會加上 Mac 寫法。
+- **設定位置**：Settings ▸ Keystrokes ▸ 主要顯示（Mac／Windows），或選單列 ▸ Keystroke Options ▸「Mac 為主、Windows 為輔」／「Windows 為主、Mac 為輔」。
+
 <!-- 截圖：07-windows-equivalent.png -->
 <p align="center"><img src="docs/screenshots/07-windows-equivalent.png" width="520" alt="Windows 對照（待補截圖）"></p>
 

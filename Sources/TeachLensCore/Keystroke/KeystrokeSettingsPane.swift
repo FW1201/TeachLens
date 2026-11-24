@@ -24,9 +24,26 @@ struct KeystrokeSettingsPane: View {
                 }
                 Toggle(L10n.t("Include mouse clicks in shortcuts", "快捷鍵包含滑鼠點擊"), isOn: $draft.showMouseEvents)
                 Toggle(L10n.t("Click ripples at the pointer", "點擊時顯示漣漪"), isOn: $draft.showClickRipples)
+                Picker(selection: $draft.primaryPlatform) {
+                    ForEach(KeystrokePlatform.allCases, id: \.self) { platform in
+                        Text(platform.shortTitle).tag(platform)
+                    }
+                } label: {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(L10n.t("Main shortcut", "主要顯示"))
+                        Text(draft.primaryPlatform == .windows
+                             ? L10n.t("The pill shows Ctrl + C for ⌘C, for classes on Windows.",
+                                      "膠囊顯示 Ctrl + C 等 Windows 快捷鍵，適合學生用 Windows 的課堂。")
+                             : L10n.t("The pill shows Mac shortcuts such as ⌘C.", "膠囊顯示 ⌘C 等 Mac 快捷鍵。"))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .pickerStyle(.segmented)
                 Toggle(isOn: $draft.windowsEquivalent) {
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(L10n.t("Show Windows equivalents", "開啟 Windows 對照"))
+                        Text(draft.primaryPlatform == .windows
+                             ? L10n.t("Also show the Mac shortcut below", "下方同時顯示 Mac 對照")
+                             : L10n.t("Show Windows equivalents", "開啟 Windows 對照"))
                         Text(L10n.t("Suggested equivalents; the actual shortcut depends on the app.",
                                     "建議對照，實際快捷鍵依軟體而異。"))
                             .font(.caption).foregroundStyle(.secondary)
