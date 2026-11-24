@@ -116,12 +116,21 @@ final class ToolSettingsModel: NSObject, ObservableObject {
         language = L10n.language
     }
 
+    /// Changes settings starting from what is saved now, so values changed
+    /// elsewhere while Settings is open (pen width or font size adjusted while
+    /// drawing, course modes) are never overwritten by a stale copy.
+    func update(_ change: (inout AppSettings) -> Void) {
+        var latest = store.load()
+        change(&latest)
+        settings = latest
+    }
+
     /// A binding to one setting, with an optional follow-up after it changes.
     func binding<T>(_ keyPath: WritableKeyPath<AppSettings, T>, after: ((T) -> Void)? = nil) -> Binding<T> {
         Binding(
             get: { self.settings[keyPath: keyPath] },
             set: { value in
-                self.settings[keyPath: keyPath] = value
+                self.update { $0[keyPath: keyPath] = value }
                 after?(value)
             }
         )
@@ -147,19 +156,21 @@ final class ToolSettingsModel: NSObject, ObservableObject {
     }
 
     private func set(_ hotKey: ToolHotKey, code: Int, modifiers: UInt) {
-        switch hotKey {
-        case .zoom: settings.hotKeyCode = code; settings.hotKeyModifiers = modifiers
-        case .live: settings.liveHotKeyCode = code; settings.liveHotKeyModifiers = modifiers
-        case .draw: settings.drawHotKeyCode = code; settings.drawHotKeyModifiers = modifiers
-        case .breakTimer: settings.breakHotKeyCode = code; settings.breakHotKeyModifiers = modifiers
-        case .snip: settings.snipHotKeyCode = code; settings.snipHotKeyModifiers = modifiers
-        case .snipOcr: settings.snipOcrHotKeyCode = code; settings.snipOcrHotKeyModifiers = modifiers
-        case .record: settings.recordHotKeyCode = code; settings.recordHotKeyModifiers = modifiers
-        case .panorama: settings.panoramaHotKeyCode = code; settings.panoramaHotKeyModifiers = modifiers
-        case .demoMirror: settings.demoMirrorHotKeyCode = code; settings.demoMirrorHotKeyModifiers = modifiers
-        #if !TEACHLENS_APP_STORE
-        case .demoType: settings.demoTypeHotKeyCode = code; settings.demoTypeHotKeyModifiers = modifiers
-        #endif
+        update { settings in
+            switch hotKey {
+            case .zoom: settings.hotKeyCode = code; settings.hotKeyModifiers = modifiers
+            case .live: settings.liveHotKeyCode = code; settings.liveHotKeyModifiers = modifiers
+            case .draw: settings.drawHotKeyCode = code; settings.drawHotKeyModifiers = modifiers
+            case .breakTimer: settings.breakHotKeyCode = code; settings.breakHotKeyModifiers = modifiers
+            case .snip: settings.snipHotKeyCode = code; settings.snipHotKeyModifiers = modifiers
+            case .snipOcr: settings.snipOcrHotKeyCode = code; settings.snipOcrHotKeyModifiers = modifiers
+            case .record: settings.recordHotKeyCode = code; settings.recordHotKeyModifiers = modifiers
+            case .panorama: settings.panoramaHotKeyCode = code; settings.panoramaHotKeyModifiers = modifiers
+            case .demoMirror: settings.demoMirrorHotKeyCode = code; settings.demoMirrorHotKeyModifiers = modifiers
+            #if !TEACHLENS_APP_STORE
+            case .demoType: settings.demoTypeHotKeyCode = code; settings.demoTypeHotKeyModifiers = modifiers
+            #endif
+            }
         }
     }
 
@@ -240,7 +251,7 @@ final class ToolSettingsModel: NSObject, ObservableObject {
     // MARK: General
 
     func setLaunchAtLogin(_ enable: Bool) {
-        settings.launchAtLogin = enable
+        update { $0.launchAtLogin = enable }
         do {
             try LaunchAtLogin.setEnabled(enable)
         } catch {
@@ -289,15 +300,15 @@ final class ToolSettingsModel: NSObject, ObservableObject {
         switch choice {
         case .breakSound:
             guard saveSelection(url, for: .breakSound) else { return }
-            settings.breakSoundFile = url.path
+            update { $0.breakSoundFile = url.path }
         case .breakBackground:
             guard saveSelection(url, for: .breakBackground) else { return }
-            settings.breakBackgroundFile = url.path
+            update { $0.breakBackgroundFile = url.path }
         case .snipFolder:
             guard saveSelection(url, for: .snipDirectory) else { return }
-            settings.snipSaveDirectory = url.path
+            update { $0.snipSaveDirectory = url.path }
         case .demoType:
-            settings.demoTypeFile = url.path
+            update { $0.demoTypeFile = url.path }
         }
     }
 
@@ -337,8 +348,10 @@ final class ToolSettingsModel: NSObject, ObservableObject {
     @objc func changeFont(_ sender: Any?) {
         let manager = sender as? NSFontManager ?? NSFontManager.shared
         let font = manager.convert(typingFont)
-        settings.typingFontName = font.fontName
-        settings.typingFontSize = font.pointSize
+        update {
+            $0.typingFontName = font.fontName
+            $0.typingFontSize = font.pointSize
+        }
     }
 
 }
@@ -546,7 +559,7 @@ struct DemoTypeToolPane: View {
                     HStack {
                         Text(L10n.t("Slow", "慢")).foregroundStyle(.secondary)
                         Slider(value: Binding(get: { Double(model.settings.demoTypeSpeed) },
-                                              set: { model.settings.demoTypeSpeed = min(max(Int($0), 10), 100) }),
+                                              set: { value in model.update { $0.demoTypeSpeed = min(max(Int(value), 10), 100) } }),
                                in: 10...100)
                             .frame(width: 180)
                         Text(L10n.t("Fast", "快")).foregroundStyle(.secondary)
@@ -580,7 +593,7 @@ struct BreakToolPane: View {
             Section {
                 HotKeyRow(model: model, title: L10n.t("Start timer", "開始計時"), hotKey: .breakTimer)
                 Stepper(value: Binding(get: { model.settings.breakDurationMinutes },
-                                       set: { model.settings.breakDurationMinutes = min(max($0, 1), 99) }),
+                                       set: { value in model.update { $0.breakDurationMinutes = min(max(value, 1), 99) } }),
                         in: 1...99) {
                     LabeledContent(L10n.t("Duration", "時間長度"),
                                    value: L10n.t("\(model.settings.breakDurationMinutes) minutes",
@@ -692,7 +705,7 @@ struct RecordToolPane: View {
                 MicrophonePicker(model: model, title: L10n.t("Microphone", "麥克風"))
                     .disabled(!model.settings.recordMicrophone)
                 Toggle(isOn: Binding(get: { model.settings.recordNoiseCancellation && model.noiseCancellationSupported },
-                                     set: { model.settings.recordNoiseCancellation = $0 })) {
+                                     set: { value in model.update { $0.recordNoiseCancellation = value } })) {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(L10n.t("Noise cancellation", "降噪"))
                         if !model.noiseCancellationSupported {
