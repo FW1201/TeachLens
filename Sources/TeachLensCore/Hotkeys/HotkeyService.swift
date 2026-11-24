@@ -1,0 +1,502 @@
+import AppKit
+import Carbon.HIToolbox
+
+@MainActor
+final class HotkeyService {
+    private let settingsStore: SettingsStore
+    private let commandHandler: (AppCommand) -> Void
+    private var hotKeyRef: EventHotKeyRef?
+    private var drawHotKeyRef: EventHotKeyRef?
+    private var liveHotKeyRef: EventHotKeyRef?
+    private var snipCopyHotKeyRef: EventHotKeyRef?
+    private var snipSaveHotKeyRef: EventHotKeyRef?
+    private var snipOcrHotKeyRef: EventHotKeyRef?
+    private var recordHotKeyRef: EventHotKeyRef?
+    private var recordRegionHotKeyRef: EventHotKeyRef?
+    #if !TEACHLENS_APP_STORE
+    private var demoTypeHotKeyRef: EventHotKeyRef?
+    private var demoTypeResetHotKeyRef: EventHotKeyRef?
+    #endif
+    private var panoramaCopyHotKeyRef: EventHotKeyRef?
+    private var panoramaSaveHotKeyRef: EventHotKeyRef?
+    private var demoMirrorScreenHotKeyRef: EventHotKeyRef?
+    private var demoMirrorRegionHotKeyRef: EventHotKeyRef?
+    private var demoMirrorWindowHotKeyRef: EventHotKeyRef?
+    private var breakHotKeyRef: EventHotKeyRef?
+    private var keystrokeHotKeyRef: EventHotKeyRef?
+    private var spotlightHotKeyRef: EventHotKeyRef?
+    private var captionsHotKeyRef: EventHotKeyRef?
+    private var whiteboardHotKeyRef: EventHotKeyRef?
+    private var zoomInNavRef: EventHotKeyRef?
+    private var zoomOutNavRef: EventHotKeyRef?
+    private var eventHandlerRef: EventHandlerRef?
+
+    init(settingsStore: SettingsStore, commandHandler: @escaping (AppCommand) -> Void) {
+        self.settingsStore = settingsStore
+        self.commandHandler = commandHandler
+    }
+
+    func start() {
+        installEventHandlerIfNeeded()
+        registerHotKey()
+    }
+
+    /// Re-registers the global hotkey from the latest saved settings. Call this
+    /// after the user changes the shortcut in the settings dialog.
+    func reloadHotkey() {
+        registerHotKey()
+    }
+
+    func stop() {
+        unregisterHotKey()
+        endLiveZoomNavigation()
+        if let eventHandlerRef {
+            RemoveEventHandler(eventHandlerRef)
+        }
+        eventHandlerRef = nil
+    }
+
+    /// Registers Option+Up / Option+Down as global hotkeys for the duration of
+    /// live zoom so they zoom in and out. They are registered globally (rather
+    /// than handled by the overlay) so they fire even though the overlay is the
+    /// key window. Option+arrows is used instead of Control+arrows because macOS
+    /// reserves Control+Up/Down for Mission Control / App Exposé and will not
+    /// yield them to a registered hotkey.
+    func beginLiveZoomNavigation() {
+        installEventHandlerIfNeeded()
+        let target = GetApplicationEventTarget()
+        let signature = fourCharacterCode("ZITM")
+
+        endLiveZoomNavigation()
+        RegisterEventHotKey(
+            UInt32(kVK_UpArrow),
+            UInt32(optionKey),
+            EventHotKeyID(signature: signature, id: 4),
+            target,
+            0,
+            &zoomInNavRef
+        )
+        RegisterEventHotKey(
+            UInt32(kVK_DownArrow),
+            UInt32(optionKey),
+            EventHotKeyID(signature: signature, id: 5),
+            target,
+            0,
+            &zoomOutNavRef
+        )
+    }
+
+    func endLiveZoomNavigation() {
+        if let zoomInNavRef {
+            UnregisterEventHotKey(zoomInNavRef)
+        }
+        zoomInNavRef = nil
+        if let zoomOutNavRef {
+            UnregisterEventHotKey(zoomOutNavRef)
+        }
+        zoomOutNavRef = nil
+    }
+
+    private func installEventHandlerIfNeeded() {
+        guard eventHandlerRef == nil else { return }
+
+        var eventType = EventTypeSpec(
+            eventClass: OSType(kEventClassKeyboard),
+            eventKind: UInt32(kEventHotKeyPressed)
+        )
+        let selfPointer = Unmanaged.passUnretained(self).toOpaque()
+
+        InstallEventHandler(
+            GetApplicationEventTarget(),
+            { _, event, userData in
+                guard let event, let userData else { return noErr }
+
+                var hotKeyID = EventHotKeyID()
+                let parameterStatus = GetEventParameter(
+                    event,
+                    EventParamName(kEventParamDirectObject),
+                    EventParamType(typeEventHotKeyID),
+                    nil,
+                    MemoryLayout<EventHotKeyID>.size,
+                    nil,
+                    &hotKeyID
+                )
+                guard parameterStatus == noErr else { return parameterStatus }
+
+                let command: AppCommand
+                switch hotKeyID.id {
+                case 1: command = .activateStaticZoom
+                case 2: command = .activateDrawWithoutZoom
+                case 3: command = .activateLiveZoom
+                case 4: command = .zoomIn
+                case 5: command = .zoomOutOrExit
+                case 6: command = .snipRegion(save: false)
+                case 7: command = .snipRegion(save: true)
+                case 8: command = .toggleRecording(region: false)
+                case 9: command = .toggleRecording(region: true)
+                case 10: command = .startPanorama(save: false)
+                case 11: command = .startPanorama(save: true)
+                case 12: command = .toggleBreakTimer
+                case 13: command = .snipOcr
+                #if !TEACHLENS_APP_STORE
+                case 14: command = .startDemoType
+                case 15: command = .resetDemoType
+                #endif
+                case 16: command = .toggleDemoMirror(scope: .screen)
+                case 17: command = .toggleDemoMirror(scope: .region)
+                case 18: command = .toggleDemoMirror(scope: .window)
+                case 19: command = .toggleKeystrokes
+                case 20: command = .toggleSpotlight
+                case 21: command = .toggleCaptions
+                case 22: command = .toggleWhiteboard
+                default: return noErr
+                }
+
+                let service = Unmanaged<HotkeyService>.fromOpaque(userData).takeUnretainedValue()
+                Task { @MainActor in
+                    service.commandHandler(command)
+                }
+                return noErr
+            },
+            1,
+            &eventType,
+            selfPointer,
+            &eventHandlerRef
+        )
+    }
+
+    private func registerHotKey() {
+        unregisterHotKey()
+
+        let settings = settingsStore.load()
+        let target = GetApplicationEventTarget()
+        let signature = fourCharacterCode("ZITM")
+
+        let zoomModifiers = NSEvent.ModifierFlags(rawValue: settings.hotKeyModifiers)
+        RegisterEventHotKey(
+            UInt32(settings.hotKeyCode),
+            carbonModifiers(from: zoomModifiers),
+            EventHotKeyID(signature: signature, id: 1),
+            target,
+            0,
+            &hotKeyRef
+        )
+
+        let drawModifiers = NSEvent.ModifierFlags(rawValue: settings.drawHotKeyModifiers)
+        RegisterEventHotKey(
+            UInt32(settings.drawHotKeyCode),
+            carbonModifiers(from: drawModifiers),
+            EventHotKeyID(signature: signature, id: 2),
+            target,
+            0,
+            &drawHotKeyRef
+        )
+
+        let liveModifiers = NSEvent.ModifierFlags(rawValue: settings.liveHotKeyModifiers)
+        RegisterEventHotKey(
+            UInt32(settings.liveHotKeyCode),
+            carbonModifiers(from: liveModifiers),
+            EventHotKeyID(signature: signature, id: 3),
+            target,
+            0,
+            &liveHotKeyRef
+        )
+
+        // Region snip: the base shortcut copies the region; the same shortcut
+        // with Shift toggled saves it to a file.
+        let snipModifiers = NSEvent.ModifierFlags(rawValue: settings.snipHotKeyModifiers)
+        RegisterEventHotKey(
+            UInt32(settings.snipHotKeyCode),
+            carbonModifiers(from: snipModifiers),
+            EventHotKeyID(signature: signature, id: 6),
+            target,
+            0,
+            &snipCopyHotKeyRef
+        )
+
+        let snipSaveModifiers = NSEvent.ModifierFlags(rawValue: settings.snipHotKeyModifiers ^ NSEvent.ModifierFlags.shift.rawValue)
+        RegisterEventHotKey(
+            UInt32(settings.snipHotKeyCode),
+            carbonModifiers(from: snipSaveModifiers),
+            EventHotKeyID(signature: signature, id: 7),
+            target,
+            0,
+            &snipSaveHotKeyRef
+        )
+
+        // OCR snip: recognizes text in the selected region and copies it to the
+        // clipboard. A key code of 0 disables the hotkey, matching TeachLens.
+        if settings.snipOcrHotKeyCode != 0 {
+            let snipOcrModifiers = NSEvent.ModifierFlags(rawValue: settings.snipOcrHotKeyModifiers)
+            RegisterEventHotKey(
+                UInt32(settings.snipOcrHotKeyCode),
+                carbonModifiers(from: snipOcrModifiers),
+                EventHotKeyID(signature: signature, id: 13),
+                target,
+                0,
+                &snipOcrHotKeyRef
+            )
+        }
+
+        // Recording: the base shortcut records the whole screen; the same
+        // shortcut with Shift toggled records a selected region.
+        let recordModifiers = NSEvent.ModifierFlags(rawValue: settings.recordHotKeyModifiers)
+        RegisterEventHotKey(
+            UInt32(settings.recordHotKeyCode),
+            carbonModifiers(from: recordModifiers),
+            EventHotKeyID(signature: signature, id: 8),
+            target,
+            0,
+            &recordHotKeyRef
+        )
+
+        let recordRegionModifiers = NSEvent.ModifierFlags(rawValue: settings.recordHotKeyModifiers ^ NSEvent.ModifierFlags.shift.rawValue)
+        RegisterEventHotKey(
+            UInt32(settings.recordHotKeyCode),
+            carbonModifiers(from: recordRegionModifiers),
+            EventHotKeyID(signature: signature, id: 9),
+            target,
+            0,
+            &recordRegionHotKeyRef
+        )
+
+        #if !TEACHLENS_APP_STORE
+        if settings.demoTypeHotKeyCode != 0 {
+            let demoTypeModifiers = NSEvent.ModifierFlags(rawValue: settings.demoTypeHotKeyModifiers)
+            RegisterEventHotKey(
+                UInt32(settings.demoTypeHotKeyCode),
+                carbonModifiers(from: demoTypeModifiers),
+                EventHotKeyID(signature: signature, id: 14),
+                target,
+                0,
+                &demoTypeHotKeyRef
+            )
+
+            let demoTypeResetModifiers = NSEvent.ModifierFlags(rawValue: settings.demoTypeHotKeyModifiers ^ NSEvent.ModifierFlags.shift.rawValue)
+            RegisterEventHotKey(
+                UInt32(settings.demoTypeHotKeyCode),
+                carbonModifiers(from: demoTypeResetModifiers),
+                EventHotKeyID(signature: signature, id: 15),
+                target,
+                0,
+                &demoTypeResetHotKeyRef
+            )
+        }
+        #endif
+
+        // Panorama: the base shortcut copies the stitched panorama to the
+        // clipboard; the same shortcut with Shift toggled saves it to a file.
+        let panoramaModifiers = NSEvent.ModifierFlags(rawValue: settings.panoramaHotKeyModifiers)
+        RegisterEventHotKey(
+            UInt32(settings.panoramaHotKeyCode),
+            carbonModifiers(from: panoramaModifiers),
+            EventHotKeyID(signature: signature, id: 10),
+            target,
+            0,
+            &panoramaCopyHotKeyRef
+        )
+
+        let panoramaSaveModifiers = NSEvent.ModifierFlags(rawValue: settings.panoramaHotKeyModifiers ^ NSEvent.ModifierFlags.shift.rawValue)
+        RegisterEventHotKey(
+            UInt32(settings.panoramaHotKeyCode),
+            carbonModifiers(from: panoramaSaveModifiers),
+            EventHotKeyID(signature: signature, id: 11),
+            target,
+            0,
+            &panoramaSaveHotKeyRef
+        )
+
+        let breakModifiers = NSEvent.ModifierFlags(rawValue: settings.breakHotKeyModifiers)
+        RegisterEventHotKey(
+            UInt32(settings.breakHotKeyCode),
+            carbonModifiers(from: breakModifiers),
+            EventHotKeyID(signature: signature, id: 12),
+            target,
+            0,
+            &breakHotKeyRef
+        )
+
+        // Keystroke overlay toggle (TeachLens addition, default Control+0).
+        let keystrokeSettings = KeystrokeSettingsStore().load()
+        if keystrokeSettings.toggleKeyCode != 0 {
+            let keystrokeModifiers = NSEvent.ModifierFlags(rawValue: keystrokeSettings.toggleModifiers)
+            RegisterEventHotKey(
+                UInt32(keystrokeSettings.toggleKeyCode),
+                carbonModifiers(from: keystrokeModifiers),
+                EventHotKeyID(signature: signature, id: 19),
+                target,
+                0,
+                &keystrokeHotKeyRef
+            )
+        }
+
+        // Spotlight toggle (TeachLens addition, default Control+Shift+0).
+        let spotlightSettings = SpotlightSettingsStore().load()
+        if spotlightSettings.toggleKeyCode != 0 {
+            RegisterEventHotKey(
+                UInt32(spotlightSettings.toggleKeyCode),
+                carbonModifiers(from: NSEvent.ModifierFlags(rawValue: spotlightSettings.toggleModifiers)),
+                EventHotKeyID(signature: signature, id: 20),
+                target,
+                0,
+                &spotlightHotKeyRef
+            )
+        }
+
+        // Live captions toggle (TeachLens addition, default Control+Shift+C).
+        let captionSettings = CaptionSettingsStore().load()
+        if captionSettings.toggleKeyCode != 0 {
+            RegisterEventHotKey(
+                UInt32(captionSettings.toggleKeyCode),
+                carbonModifiers(from: NSEvent.ModifierFlags(rawValue: captionSettings.toggleModifiers)),
+                EventHotKeyID(signature: signature, id: 21),
+                target,
+                0,
+                &captionsHotKeyRef
+            )
+        }
+
+        // Whiteboard (TeachLens addition): Control+Shift+W.
+        RegisterEventHotKey(
+            UInt32(HotkeyConflicts.whiteboardKeyCode),
+            carbonModifiers(from: NSEvent.ModifierFlags(rawValue: HotkeyConflicts.whiteboardModifiers)),
+            EventHotKeyID(signature: signature, id: 22),
+            target,
+            0,
+            &whiteboardHotKeyRef
+        )
+
+        // DemoMirror: the base shortcut mirrors the whole screen; the same
+        // shortcut with Shift toggled selects a region to mirror; with Option
+        // toggled it mirrors the window under the cursor.
+        let demoMirrorModifiers = NSEvent.ModifierFlags(rawValue: settings.demoMirrorHotKeyModifiers)
+        RegisterEventHotKey(
+            UInt32(settings.demoMirrorHotKeyCode),
+            carbonModifiers(from: demoMirrorModifiers),
+            EventHotKeyID(signature: signature, id: 16),
+            target,
+            0,
+            &demoMirrorScreenHotKeyRef
+        )
+
+        let demoMirrorRegionModifiers = NSEvent.ModifierFlags(rawValue: settings.demoMirrorHotKeyModifiers ^ NSEvent.ModifierFlags.shift.rawValue)
+        RegisterEventHotKey(
+            UInt32(settings.demoMirrorHotKeyCode),
+            carbonModifiers(from: demoMirrorRegionModifiers),
+            EventHotKeyID(signature: signature, id: 17),
+            target,
+            0,
+            &demoMirrorRegionHotKeyRef
+        )
+
+        let demoMirrorWindowModifiers = NSEvent.ModifierFlags(rawValue: settings.demoMirrorHotKeyModifiers ^ NSEvent.ModifierFlags.option.rawValue)
+        RegisterEventHotKey(
+            UInt32(settings.demoMirrorHotKeyCode),
+            carbonModifiers(from: demoMirrorWindowModifiers),
+            EventHotKeyID(signature: signature, id: 18),
+            target,
+            0,
+            &demoMirrorWindowHotKeyRef
+        )
+    }
+
+    private func unregisterHotKey() {
+        if let hotKeyRef {
+            UnregisterEventHotKey(hotKeyRef)
+        }
+        hotKeyRef = nil
+        if let drawHotKeyRef {
+            UnregisterEventHotKey(drawHotKeyRef)
+        }
+        drawHotKeyRef = nil
+        if let liveHotKeyRef {
+            UnregisterEventHotKey(liveHotKeyRef)
+        }
+        liveHotKeyRef = nil
+        if let snipCopyHotKeyRef {
+            UnregisterEventHotKey(snipCopyHotKeyRef)
+        }
+        snipCopyHotKeyRef = nil
+        if let snipSaveHotKeyRef {
+            UnregisterEventHotKey(snipSaveHotKeyRef)
+        }
+        snipSaveHotKeyRef = nil
+        if let snipOcrHotKeyRef {
+            UnregisterEventHotKey(snipOcrHotKeyRef)
+        }
+        snipOcrHotKeyRef = nil
+        if let recordHotKeyRef {
+            UnregisterEventHotKey(recordHotKeyRef)
+        }
+        recordHotKeyRef = nil
+        if let recordRegionHotKeyRef {
+            UnregisterEventHotKey(recordRegionHotKeyRef)
+        }
+        recordRegionHotKeyRef = nil
+        #if !TEACHLENS_APP_STORE
+        if let demoTypeHotKeyRef {
+            UnregisterEventHotKey(demoTypeHotKeyRef)
+        }
+        demoTypeHotKeyRef = nil
+        if let demoTypeResetHotKeyRef {
+            UnregisterEventHotKey(demoTypeResetHotKeyRef)
+        }
+        demoTypeResetHotKeyRef = nil
+        #endif
+        if let panoramaCopyHotKeyRef {
+            UnregisterEventHotKey(panoramaCopyHotKeyRef)
+        }
+        panoramaCopyHotKeyRef = nil
+        if let panoramaSaveHotKeyRef {
+            UnregisterEventHotKey(panoramaSaveHotKeyRef)
+        }
+        panoramaSaveHotKeyRef = nil
+        if let demoMirrorScreenHotKeyRef {
+            UnregisterEventHotKey(demoMirrorScreenHotKeyRef)
+        }
+        demoMirrorScreenHotKeyRef = nil
+        if let demoMirrorRegionHotKeyRef {
+            UnregisterEventHotKey(demoMirrorRegionHotKeyRef)
+        }
+        demoMirrorRegionHotKeyRef = nil
+        if let demoMirrorWindowHotKeyRef {
+            UnregisterEventHotKey(demoMirrorWindowHotKeyRef)
+        }
+        demoMirrorWindowHotKeyRef = nil
+        if let breakHotKeyRef {
+            UnregisterEventHotKey(breakHotKeyRef)
+        }
+        breakHotKeyRef = nil
+        if let keystrokeHotKeyRef {
+            UnregisterEventHotKey(keystrokeHotKeyRef)
+        }
+        keystrokeHotKeyRef = nil
+        if let spotlightHotKeyRef {
+            UnregisterEventHotKey(spotlightHotKeyRef)
+        }
+        spotlightHotKeyRef = nil
+        if let captionsHotKeyRef {
+            UnregisterEventHotKey(captionsHotKeyRef)
+        }
+        captionsHotKeyRef = nil
+        if let whiteboardHotKeyRef {
+            UnregisterEventHotKey(whiteboardHotKeyRef)
+        }
+        whiteboardHotKeyRef = nil
+    }
+
+    private func carbonModifiers(from flags: NSEvent.ModifierFlags) -> UInt32 {
+        var carbon: UInt32 = 0
+        if flags.contains(.command) { carbon |= UInt32(cmdKey) }
+        if flags.contains(.option) { carbon |= UInt32(optionKey) }
+        if flags.contains(.control) { carbon |= UInt32(controlKey) }
+        if flags.contains(.shift) { carbon |= UInt32(shiftKey) }
+        return carbon
+    }
+}
+
+private func fourCharacterCode(_ string: String) -> OSType {
+    string.utf8.reduce(0) { code, character in
+        (code << 8) + OSType(character)
+    }
+}

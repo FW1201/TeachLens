@@ -1,0 +1,93 @@
+name: Release
+
+# Push a tag such as v1.0.0 to build TeachLens and publish the DMG on
+# GitHub Releases (the only distribution channel; no Mac App Store build).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build (e.g. 1.0.0); no release is published for manual runs"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # Xcode 26 builds the Liquid Glass code path; the app still runs on macOS 14+.
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Self-test
+        run: swift run TeachLensSelfTest
+
+      - name: Build universal app
+        env:
+          TEACHLENS_VERSION: ${{ steps.version.outputs.version }}
+          TEACHLENS_BUNDLE_ID: io.github.fw1201.teachlens
+          TEACHLENS_DISPLAY_NAME: TeachLens
+        run: zsh Scripts/build-app.sh release
+
+      - name: Create DMG
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          STAGE="$(mktemp -d)"
+          ditto ".build/TeachLens.app" "$STAGE/TeachLens.app"
+          ln -s /Applications "$STAGE/Applications"
+          hdiutil create -volname "TeachLens $VERSION" -srcfolder "$STAGE" -ov -format UDZO ".build/TeachLens-$VERSION.dmg"
+          hdiutil verify ".build/TeachLens-$VERSION.dmg"
+          shasum -a 256 ".build/TeachLens-$VERSION.dmg" | tee ".build/TeachLens-$VERSION.dmg.sha256"
+
+      - name: Install and launch check
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          MNT="$(mktemp -d)"
+          hdiutil attach ".build/TeachLens-$VERSION.dmg" -mountpoint "$MNT" -nobrowse -quiet
+          ditto "$MNT/TeachLens.app" "/Applications/TeachLens.app"
+          hdiutil detach "$MNT" -quiet
+          open "/Applications/TeachLens.app"
+          sleep 15
+          pgrep -x TeachLens || { echo "::error::TeachLens did not stay running"; exit 1; }
+          pkill -x TeachLens || true
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: TeachLens-${{ steps.version.outputs.version }}
+          path: |
+            .build/TeachLens-*.dmg
+            .build/TeachLens-*.dmg.sha256
+
+      - name: Publish GitHub Release
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: TeachLens ${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          body: |
+            ## 下載與安裝
+            1. 下載 `TeachLens-${{ steps.version.outputs.version }}.dmg`，打開後把 TeachLens 拖到「應用程式」。
+            2. 此版本未經 Apple 公證，第一次開啟請在 App 上按右鍵 ▸「打開」，或在終端機執行：
+               `xattr -dr com.apple.quarantine /Applications/TeachLens.app`
+            3. 依提示開啟「螢幕錄製」「輸入監控」「麥克風」「語音辨識」權限。
+
+            需要 macOS 14 以上；macOS 26 以上會顯示 Liquid Glass 樣式。
+
+            Fork 開發：[數位敘事力期刊](https://www.facebook.com/Journal.of.Digital.Narrative)　·　基於 ZoomIt for Mac（MIT）與 Keyviz（GPL-3.0）
+          files: |
+            .build/TeachLens-*.dmg
+            .build/TeachLens-*.dmg.sha256

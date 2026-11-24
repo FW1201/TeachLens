@@ -1,0 +1,104 @@
+name: Build
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # Package.swift uses swift-tools-version 6.0, which needs Xcode 16+.
+    # macos-26 (Xcode 26) also compiles the Liquid Glass code path, which is
+    # behind `#if compiler(>=6.2)`.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-26]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Build
+        run: |
+          set -o pipefail
+          if ! swift build 2>&1 | tee build.log; then
+            echo "==================== compiler errors ===================="
+            grep -E "error:" build.log | sort -u | head -80
+            exit 1
+          fi
+
+      - name: Self-test
+        run: swift run TeachLensSelfTest
+
+      - name: Package release app and DMG
+        run: |
+          zsh Scripts/build-app.sh release
+          STAGE="$(mktemp -d)"
+          ditto ".build/TeachLens (Dev).app" "$STAGE/TeachLens (Dev).app"
+          ln -s /Applications "$STAGE/Applications"
+          hdiutil create -volname "TeachLens Dev" -srcfolder "$STAGE" -ov -format UDZO ".build/TeachLens-Dev.dmg"
+          hdiutil verify ".build/TeachLens-Dev.dmg"
+
+      - name: Install and launch smoke test
+        run: |
+          set -x
+          set +e
+          MNT="$(mktemp -d)"
+          hdiutil attach ".build/TeachLens-Dev.dmg" -mountpoint "$MNT" -nobrowse -quiet
+          rm -rf "/Applications/TeachLens (Dev).app"
+          ditto "$MNT/TeachLens (Dev).app" "/Applications/TeachLens (Dev).app"
+          hdiutil detach "$MNT" -quiet
+          xattr -dr com.apple.quarantine "/Applications/TeachLens (Dev).app" || true
+          codesign --verify --deep --strict --verbose=2 "/Applications/TeachLens (Dev).app"
+          mkdir -p smoke
+          codesign -d --entitlements :- "/Applications/TeachLens (Dev).app" > smoke/entitlements.plist 2>&1 || true
+          if grep -q "com.apple.developer" smoke/entitlements.plist; then
+            echo "::error::Ad-hoc build still carries restricted entitlements"; FAILED=1
+          fi
+          START="$(date +%s)"
+          open "/Applications/TeachLens (Dev).app" > smoke/open.txt 2>&1 || { cat smoke/open.txt; echo "::error::launch failed"; FAILED=1; }
+          sleep 15
+          screencapture -x smoke/after-launch.png || true
+          if ! pgrep -x TeachLens > smoke/pid.txt; then
+            echo "::error::TeachLens is not running 15 s after launch"
+            FAILED=1
+          fi
+          # Second launch must not start a second instance.
+          open "/Applications/TeachLens (Dev).app"
+          sleep 5
+          COUNT="$(pgrep -x TeachLens | wc -l | tr -d ' ')"
+          echo "instances=$COUNT" | tee -a smoke/pid.txt
+          [ "$COUNT" -le 1 ] || { echo "::error::Single-instance check failed ($COUNT running)"; FAILED=1; }
+          log show --last 2m --style compact --predicate 'process == "TeachLens"' > smoke/teachlens.log 2>&1 || true
+          find ~/Library/Logs/DiagnosticReports -name 'TeachLens*' -newermt "@$START" -exec cp {} smoke/ \; 2>/dev/null || true
+          if ls smoke/TeachLens*.ips >/dev/null 2>&1; then
+            echo "::error::TeachLens crashed during the smoke test"
+            FAILED=1
+          fi
+          pkill -x TeachLens || true
+          exit "${FAILED:-0}"
+
+      - name: Upload smoke-test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-${{ matrix.os }}
+          path: smoke/
+          if-no-files-found: ignore
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: TeachLens-Dev-dmg-${{ matrix.os }}
+          path: .build/TeachLens-Dev.dmg
+          if-no-files-found: error

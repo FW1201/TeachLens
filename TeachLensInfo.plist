@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>io.github.fw1201.teachlens</string>
+    <key>CFBundleName</key>
+    <string>TeachLens</string>
+    <key>CFBundleDisplayName</key>
+    <string>TeachLens</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>TeachLens uses your microphone for enabled screen recording audio and optional snip dictation.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>TeachLens transcribes speech you record while dragging a snip when snip dictation is enabled.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>TeachLens shows your webcam as a picture-in-picture overlay when you enable it for screen recordings.</string>
+</dict>
+</plist>
