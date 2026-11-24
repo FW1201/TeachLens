@@ -14,10 +14,19 @@ Read [`AGENTS.md`](AGENTS.md) first: build commands, code map and conventions.
   Run `swift build && swift run TeachLensSelfTest` locally first. Fix anything that fails before other work.
 - Hands-on QA: plan in `docs/test-plans/1.3.0-beta.3-test-plan.md`, first-round report in `docs/test-reports/2026-11-24-1.3.0-beta.3.md`. Codex (computer use) runs the plan against the app built by `Scripts/build-app.sh`.
 
+## Phase (owner, 2026-11-24)
+
+**Polish phase.** The overall structure is frozen: no new panes, windows, modules or settings
+architecture changes. Only fixes, wording, spacing, icons and small behavior tweaks.
+
+- Done since the handoff: video editor async `load…` APIs (`42f562f`, `c4bac00`); custom
+  keystroke shortcuts with captions (`1921dee`, test case E-14).
+- A scheduled CI re-run is set for 2026-11-25 02:00 (Asia/Taipei).
+
 ## Next round (agreed with the owner)
 
 1. Fix whatever the hands-on QA finds; update the report.
-2. `Capture/VideoClipEditorController.swift`: replace deprecated `tracks(withMediaType:)`, `naturalSize` and `preferredTransform` with the async `load…` APIs.
+2. ~~`Capture/VideoClipEditorController.swift`: async `load…` APIs~~ — done.
 3. Before merging PR #11, CI must pass on **both** macOS 15 and 26. Then bump `VERSION` if needed and merge. The release workflow publishes the pre-release.
 
 ## Owner preferences
