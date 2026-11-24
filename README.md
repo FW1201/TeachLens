@@ -1,8 +1,26 @@
+<p align="center"><img src="docs/icon.png" width="160" alt="TeachLens icon"></p>
+
 # TeachLens
 
-TeachLens is a macOS menu-bar toolkit for online teaching and screen-based lectures. It combines screen zoom, live zoom, on-screen drawing, a break timer, snips/OCR, and screen recording, and its roadmap adds keystroke and mouse visualization, spotlight, course-mode presets, live captions, and a multi-page whiteboard.
+TeachLens is a free, open-source macOS menu-bar toolkit for online teaching and screen-based lectures: keystroke and mouse-click display (with Windows equivalents), spotlight and cursor highlight, screen zoom and live zoom, on-screen drawing, live captions with transcript export, course-mode presets, a break timer, snips/OCR and screen recording.
 
-> **Status:** M1 (keystroke visualization). The ZoomIt for Mac feature set plus a Swift port of Keyviz's keystroke and mouse-click display, drawn as a frosted pill (Liquid Glass on macOS 26 and later). See [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md) for the roadmap.
+**Fork 開發：[數位敘事力期刊 Journal of Digital Narrative](https://www.facebook.com/Journal.of.Digital.Narrative)**
+
+## Download and install
+
+TeachLens is distributed only as an open-source download from **[GitHub Releases](https://github.com/FW1201/keyviz-for-Mac/releases)** — there is no Mac App Store version.
+
+1. Download `TeachLens-<version>.dmg` from the latest release and open it.
+2. Drag **TeachLens** into **Applications**.
+3. The build is not notarized by Apple, so macOS blocks the first launch. Either right-click the app ▸ **Open** ▸ **Open**, or run once in Terminal:
+
+   ```sh
+   xattr -dr com.apple.quarantine "/Applications/TeachLens.app"
+   ```
+
+4. Grant the permissions TeachLens asks for (System Settings ▸ Privacy & Security): **Screen Recording** (zoom, snip, record), **Input Monitoring** (keystroke display), **Microphone** and **Speech Recognition** (live captions). Quit and reopen TeachLens after granting Input Monitoring or Screen Recording.
+
+Requires macOS 14 or later. Liquid Glass styling appears on macOS 26 and later.
 
 ## Credits and open-source origins
 
@@ -13,7 +31,7 @@ TeachLens is a derivative work of two open-source projects:
 | [ZoomIt for Mac](https://github.com/microsoft/Zoomit-Mac) | Microsoft Corporation | MIT | Application base: zoom, drawing, timer, capture, recording (imported at upstream commit `45e15ac`) |
 | [Keyviz](https://github.com/mulaRahul/keyviz) | Rahul Mula | GPL-3.0 | Keystroke and mouse visualization (being ported to Swift; original Tauri source kept in [`Legacy/keyviz/`](Legacy/keyviz/)) |
 
-TeachLens as a whole is distributed under the **GNU GPL-3.0** ([LICENSE](LICENSE)). The MIT notice for ZoomIt for Mac is kept in [ThirdParty/ZoomIt-Mac-LICENSE.txt](ThirdParty/ZoomIt-Mac-LICENSE.txt); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). TeachLens is not affiliated with or endorsed by Microsoft, Sysinternals, or the Keyviz project. The settings footer in the app shows the same credits.
+TeachLens as a whole is distributed under the **GNU GPL-3.0** ([LICENSE](LICENSE)). The MIT notice for ZoomIt for Mac is kept in [ThirdParty/ZoomIt-Mac-LICENSE.txt](ThirdParty/ZoomIt-Mac-LICENSE.txt); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). TeachLens is maintained as a fork by [數位敘事力期刊 Journal of Digital Narrative](https://www.facebook.com/Journal.of.Digital.Narrative) and is not affiliated with or endorsed by Microsoft, Sysinternals, or the Keyviz project. The App Store build option inherited from ZoomIt for Mac is kept in the source but not used for distribution. The settings footer in the app shows the same credits.
 
 ## Default hotkeys
 
@@ -239,7 +257,7 @@ Override any field explicitly with `TEACHLENS_SIGN_IDENTITY`, `TEACHLENS_BUNDLE_
 
 ### Entitlements (camera, microphone, and Speech Recognition)
 
-`build-app.sh` signs both Homebrew and App Store variants with camera/audio-input access plus `com.apple.developer.speech-recognition`. These are required for the webcam, microphone capture, and Apple Speech transcription under their respective distribution constraints. Screen Recording is pure TCC and needs no entitlement. The entitlements are embedded even for ad-hoc builds so a later re-sign preserves them. Verify on the first signed build with `codesign -d --entitlements :- TeachLens.app`.
+`build-app.sh` signs with camera and audio-input entitlements. The restricted `com.apple.developer.speech-recognition` entitlement needs a provisioning profile, so it is removed from ad-hoc builds (otherwise macOS refuses to launch the app); outside the sandbox, speech recognition only needs the Info.plist usage description. Screen Recording is pure TCC and needs no entitlement. Verify on the first signed build with `codesign -d --entitlements :- TeachLens.app`.
 
 ### Signing options
 

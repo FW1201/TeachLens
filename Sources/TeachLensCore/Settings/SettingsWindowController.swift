@@ -476,6 +476,15 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         copyright.textColor = .secondaryLabelColor
         copyright.alignment = .center
 
+        let forkLink = LinkButton(title: AppInfo.forkCredit, target: self, action: #selector(openForkPage(_:)))
+        forkLink.isBordered = false
+        forkLink.bezelStyle = .inline
+        forkLink.attributedTitle = NSAttributedString(
+            string: AppInfo.forkCredit,
+            attributes: [.foregroundColor: NSColor.linkColor, .font: NSFont.systemFont(ofSize: 10)]
+        )
+        forkLink.toolTip = AppInfo.forkURL
+
         let attribution = makeLabel(AppInfo.attribution)
         attribution.font = NSFont.systemFont(ofSize: 10)
         attribution.textColor = .tertiaryLabelColor
@@ -491,7 +500,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
 
         let link = makeLink(title: "github.com/FW1201/keyviz-for-Mac")
 
-        let stack = NSStackView(views: [title, copyright, attribution, link])
+        let stack = NSStackView(views: [title, copyright, attribution, forkLink, link])
         stack.orientation = .vertical
         stack.alignment = .centerX
         stack.spacing = 2
@@ -515,6 +524,11 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         button.toolTip = SettingsWindowController.homepageURLString
         button.setAccessibilityRole(.link)
         return button
+    }
+
+    @objc private func openForkPage(_ sender: Any?) {
+        guard let url = URL(string: AppInfo.forkURL) else { return }
+        NSWorkspace.shared.open(url)
     }
 
     @objc private func openHomepage(_ sender: Any?) {

@@ -12,6 +12,10 @@ public enum AppInfo {
     /// THIRD_PARTY_NOTICES.md.
     public static let attribution = "Based on ZoomIt for Mac (MIT) and Keyviz (GPL-3.0)"
     public static let license = "GPL-3.0"
+    /// Fork maintainer credit (Journal of Digital Narrative / 數位敘事力期刊).
+    public static let forkCredit = "Fork 開發：數位敘事力期刊"
+    public static let forkURL = "https://www.facebook.com/Journal.of.Digital.Narrative"
+    public static let repositoryURL = "https://github.com/FW1201/keyviz-for-Mac"
 
     static func resolveVersion(from infoDictionary: [String: Any]?) -> String {
         for key in ["CFBundleShortVersionString", "CFBundleVersion"] {

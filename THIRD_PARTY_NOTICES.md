@@ -1,6 +1,7 @@
 # Third-Party Notices
 
 TeachLens is distributed under the GNU General Public License v3.0 (see `LICENSE`).
+Fork 開發：數位敘事力期刊 Journal of Digital Narrative — https://www.facebook.com/Journal.of.Digital.Narrative
 It incorporates or is derived from the following open-source projects.
 
 ## ZoomIt for Mac

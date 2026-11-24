@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="${0:A:h:h}"
 CONFIGURATION="${1:-debug}"
-ICON_SOURCE="$ROOT_DIR/Sources/TeachLensCore/Resources/TeachLensColorIcon.png"
+ICON_SOURCE="$ROOT_DIR/Sources/TeachLensCore/Resources/TeachLensAppIcon.png"
 
 DIST_DISTRIBUTION="${TEACHLENS_DISTRIBUTION:-homebrew}"
 case "$DIST_DISTRIBUTION" in
