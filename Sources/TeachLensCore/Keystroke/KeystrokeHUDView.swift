@@ -120,6 +120,7 @@ struct KeystrokeHUDView: View {
                                        showWindows: settings.windowsEquivalent, primary: settings.primaryPlatform)
                 }
                 .padding(CGFloat(settings.margin))
+                .padding(.bottom, CGFloat(settings.meetingInset))
             }
             ZStack(alignment: .topLeading) {
                 Color.clear
@@ -266,6 +267,14 @@ struct KeystrokePillView: View {
     var body: some View {
         let s = scale
         HStack(spacing: 6 * s) {
+            if group.modifiersAreWords {
+                // A small Windows mark so students see at a glance which system it is.
+                Image(systemName: "squareshape.split.2x2")
+                    .font(.system(size: 15 * s, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .padding(.leading, 6 * s)
+                    .accessibilityLabel("Windows")
+            }
             if !group.modifierGlyphs.isEmpty {
                 Text(group.modifierGlyphs)
                     .font(.system(size: (group.modifiersAreWords ? 17 : 21) * s, weight: .semibold, design: .rounded))

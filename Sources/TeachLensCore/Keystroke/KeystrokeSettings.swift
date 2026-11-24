@@ -38,6 +38,21 @@ enum KeystrokePlatform: String, Codable, CaseIterable, Sendable {
     }
 }
 
+/// Size presets named for where the class is seen, instead of a bare scale.
+enum KeystrokeSizePreset: Double, CaseIterable, Sendable {
+    case small = 0.85
+    case normal = 1.0
+    case large = 1.5
+
+    var title: String {
+        switch self {
+        case .small: return L10n.t("Small screen share", "小螢幕分享")
+        case .normal: return L10n.t("Standard", "一般")
+        case .large: return L10n.t("Classroom projector", "大教室投影")
+        }
+    }
+}
+
 /// How the pill's background is drawn.
 enum KeystrokeGlass: String, Codable, CaseIterable, Sendable {
     /// Liquid Glass on macOS 26 and later, frosted material before that.
@@ -78,12 +93,33 @@ struct KeystrokeSettings: Codable, Equatable, Sendable {
     var windowsEquivalent = false
     /// Show the Windows shortcut in the main pill and the Mac one below it.
     var primaryPlatform: KeystrokePlatform = .mac
+    /// Keep bottom pills clear of the Zoom / Meet / Teams control bar.
+    var avoidMeetingBar = true
     /// Global toggle hotkey: virtual key code and NSEvent modifier raw value.
     /// Defaults to Control+0 (ZoomIt uses Control+1 … Control+9).
     var toggleKeyCode = 29
     var toggleModifiers: UInt = 1 << 18
 
     init() {}
+
+    /// Room left at the bottom for a video-call control bar, in points.
+    static let meetingBarHeight: Double = 80
+
+    /// Extra space under bottom-positioned pills.
+    var meetingInset: Double {
+        avoidMeetingBar && !position.isTop ? Self.meetingBarHeight : 0
+    }
+
+    /// How far from its edge the HUD reaches (edge distance plus the newest
+    /// pill, the Windows line and any history), so captions can keep clear.
+    var occupiedHeight: Double {
+        guard enabled else { return 0 }
+        let s = min(max(scale, 0.5), 3)
+        var height = margin + meetingInset + 60 * s
+        if windowsEquivalent { height += 34 * s }
+        if showHistory { height += Double(max(0, maxHistory - 1)) * 58 * s }
+        return height
+    }
 
     var engineConfig: KeystrokeEngineConfig {
         KeystrokeEngineConfig(
@@ -100,7 +136,7 @@ struct KeystrokeSettings: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case enabled, filter, allowedKeys, showHistory, maxHistory, showMouseEvents, showClickRipples
         case lingerSeconds, dragThreshold, position, glass, scale, margin, toggleKeyCode, toggleModifiers
-        case windowsEquivalent, primaryPlatform
+        case windowsEquivalent, primaryPlatform, avoidMeetingBar
     }
 
     init(from decoder: Decoder) throws {
@@ -121,6 +157,7 @@ struct KeystrokeSettings: Codable, Equatable, Sendable {
         margin = try c.decodeIfPresent(Double.self, forKey: .margin) ?? d.margin
         windowsEquivalent = try c.decodeIfPresent(Bool.self, forKey: .windowsEquivalent) ?? d.windowsEquivalent
         primaryPlatform = (try? c.decodeIfPresent(KeystrokePlatform.self, forKey: .primaryPlatform)) ?? d.primaryPlatform
+        avoidMeetingBar = try c.decodeIfPresent(Bool.self, forKey: .avoidMeetingBar) ?? d.avoidMeetingBar
         toggleKeyCode = try c.decodeIfPresent(Int.self, forKey: .toggleKeyCode) ?? d.toggleKeyCode
         toggleModifiers = try c.decodeIfPresent(UInt.self, forKey: .toggleModifiers) ?? d.toggleModifiers
     }

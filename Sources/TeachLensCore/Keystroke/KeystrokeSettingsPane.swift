@@ -13,6 +13,7 @@ struct KeystrokeSettingsPane: View {
     @State private var didLoad = false
     @StateObject private var recorder = ShortcutRecorder()
     @State private var permissionGranted = InputMonitoringPermission.isGranted
+    @State private var presentationDisplay: CGDirectDisplayID = PresentationDisplay.selectedID
 
     var body: some View {
         Form {
@@ -49,6 +50,12 @@ struct KeystrokeSettingsPane: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
+                Button {
+                    WindowsEquivalent.exportCheatSheet()
+                } label: {
+                    Label(L10n.t("Export Mac ↔ Windows handout (PDF)…", "匯出 Mac ↔ Windows 對照講義（PDF）…"),
+                          systemImage: "doc.richtext")
+                }
                 Toggle(L10n.t("Keep recent shortcuts", "保留最近的快捷鍵"), isOn: $draft.showHistory)
                 if draft.showHistory {
                     Stepper(L10n.t("Recent shortcuts: \(draft.maxHistory)", "最近快捷鍵：\(draft.maxHistory)"), value: $draft.maxHistory, in: 2...6)
@@ -65,10 +72,39 @@ struct KeystrokeSettingsPane: View {
                         Text(glass.title).tag(glass)
                     }
                 }
-                LabeledContent(L10n.t("Size", "大小")) {
-                    Slider(value: $draft.scale, in: 0.5...3, step: 0.25)
-                        .frame(width: 180)
+                Picker(L10n.t("Size", "大小"), selection: $draft.scale) {
+                    ForEach(KeystrokeSizePreset.allCases, id: \.self) { preset in
+                        Text(preset.title).tag(preset.rawValue)
+                    }
+                    if KeystrokeSizePreset(rawValue: draft.scale) == nil {
+                        Text(L10n.t("Custom ×\(String(format: "%.2g", draft.scale))",
+                                    "自訂 ×\(String(format: "%.2g", draft.scale))")).tag(draft.scale)
+                    }
                 }
+                Toggle(isOn: $draft.avoidMeetingBar) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(L10n.t("Keep clear of the video-call bar", "避開會議軟體控制列"))
+                        Text(L10n.t("Bottom pills sit higher so Zoom, Meet and Teams controls don't cover them.",
+                                    "下方的按鍵膠囊往上移，不會被 Zoom、Meet、Teams 的控制列擋住。"))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                Picker(selection: $presentationDisplay) {
+                    Text(L10n.t("Follow the pointer", "跟隨游標")).tag(CGDirectDisplayID(0))
+                    ForEach(NSScreen.screens, id: \.self) { screen in
+                        if let id = PresentationDisplay.displayID(of: screen) {
+                            Text(screen.localizedName).tag(id)
+                        }
+                    }
+                } label: {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(L10n.t("Shared screen", "分享中的螢幕"))
+                        Text(L10n.t("Keystrokes and captions stay on the screen students see.",
+                                    "按鍵與字幕固定顯示在學生看得到的螢幕。"))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .onChange(of: presentationDisplay) { _, id in PresentationDisplay.selectedID = id }
                 LabeledContent(L10n.t("Stay on screen", "停留時間")) {
                     HStack {
                         Slider(value: $draft.lingerSeconds, in: 1...10, step: 0.5)

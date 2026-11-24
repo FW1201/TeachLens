@@ -27,6 +27,8 @@ final class HotkeyService {
     private var spotlightHotKeyRef: EventHotKeyRef?
     private var captionsHotKeyRef: EventHotKeyRef?
     private var whiteboardHotKeyRef: EventHotKeyRef?
+    private var hideOverlaysHotKeyRef: EventHotKeyRef?
+    private var countdownHotKeyRef: EventHotKeyRef?
     private var zoomInNavRef: EventHotKeyRef?
     private var zoomOutNavRef: EventHotKeyRef?
     private var eventHandlerRef: EventHandlerRef?
@@ -149,6 +151,8 @@ final class HotkeyService {
                 case 20: command = .toggleSpotlight
                 case 21: command = .toggleCaptions
                 case 22: command = .toggleWhiteboard
+                case 23: command = .toggleHideOverlays
+                case 24: command = .toggleCountdown
                 default: return noErr
                 }
 
@@ -366,6 +370,25 @@ final class HotkeyService {
             &whiteboardHotKeyRef
         )
 
+        // Hide overlays (Control+Option+Command+H) and the classroom countdown
+        // (Control+Shift+T) are fixed TeachLens shortcuts.
+        RegisterEventHotKey(
+            UInt32(HotkeyConflicts.hideOverlaysKeyCode),
+            carbonModifiers(from: NSEvent.ModifierFlags(rawValue: HotkeyConflicts.hideOverlaysModifiers)),
+            EventHotKeyID(signature: signature, id: 23),
+            target,
+            0,
+            &hideOverlaysHotKeyRef
+        )
+        RegisterEventHotKey(
+            UInt32(HotkeyConflicts.countdownKeyCode),
+            carbonModifiers(from: NSEvent.ModifierFlags(rawValue: HotkeyConflicts.countdownModifiers)),
+            EventHotKeyID(signature: signature, id: 24),
+            target,
+            0,
+            &countdownHotKeyRef
+        )
+
         // DemoMirror: the base shortcut mirrors the whole screen; the same
         // shortcut with Shift toggled selects a region to mirror; with Option
         // toggled it mirrors the window under the cursor.
@@ -483,6 +506,14 @@ final class HotkeyService {
             UnregisterEventHotKey(whiteboardHotKeyRef)
         }
         whiteboardHotKeyRef = nil
+        if let hideOverlaysHotKeyRef {
+            UnregisterEventHotKey(hideOverlaysHotKeyRef)
+        }
+        hideOverlaysHotKeyRef = nil
+        if let countdownHotKeyRef {
+            UnregisterEventHotKey(countdownHotKeyRef)
+        }
+        countdownHotKeyRef = nil
     }
 
     private func carbonModifiers(from flags: NSEvent.ModifierFlags) -> UInt32 {

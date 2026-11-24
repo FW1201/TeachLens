@@ -20,6 +20,7 @@ enum KeystrokeSelfTests {
         try testCombinationExpiresAsAWhole()
         try testReleasedKeyLeavesCombination()
         try testWindowsFirstPill()
+        try testMeetingBarAndCaptionClearance()
         try testModifierClickAndDrag()
         try testScrollReleasesAfterLinger()
         try testSettingsRoundTripAndDefaults()
@@ -184,6 +185,24 @@ enum KeystrokeSelfTests {
         try expect(!e.groups.isEmpty, "The combination should linger after release")
         e.tick(at: 6.5)
         try expect(e.groups.isEmpty, "The combination should leave together")
+    }
+
+    private static func testMeetingBarAndCaptionClearance() throws {
+        var settings = KeystrokeSettings()
+        settings.position = .bottomCenter
+        try expect(settings.avoidMeetingBar && settings.meetingInset == KeystrokeSettings.meetingBarHeight,
+                   "Bottom pills should keep clear of the meeting bar by default")
+        settings.position = .topCenter
+        try expect(settings.meetingInset == 0, "Top pills need no meeting-bar room")
+        settings.position = .bottomCenter
+        let plain = settings.occupiedHeight
+        settings.windowsEquivalent = true
+        try expect(settings.occupiedHeight > plain, "The Windows line should take more room")
+        settings.enabled = false
+        try expect(settings.occupiedHeight == 0, "Hidden keystrokes take no room")
+        try expect(KeystrokeSizePreset(rawValue: KeystrokeSettings().scale) == .normal,
+                   "The default size should be the Standard preset")
+        try expect(WindowsEquivalent.cheatSheet.count >= 20, "The handout should list the common shortcuts")
     }
 
     private static func testWindowsFirstPill() throws {

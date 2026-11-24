@@ -13,6 +13,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var graphicalItem: NSMenuItem?
     private var isRecording = false
     private var onboarding: OnboardingController?
+    /// What was showing before "Hide overlays", to bring it back.
+    private var hiddenOverlays: (keystrokes: Bool, spotlight: Bool, captions: Bool)?
 
     /// Rebuilds the status menu and Settings in the newly chosen language.
     private func applyLanguageChange() {
@@ -111,6 +113,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         modeCoordinator.onToggleCaptions = { [weak captionController] in
             captionController?.toggle()
+        }
+        keystrokeController.onSettingsChange = { [weak captionController] settings in
+            captionController?.avoid(keystrokes: settings)
+        }
+        captionController.avoid(keystrokes: keystrokeController.settings)
+        modeCoordinator.onToggleHideOverlays = { [weak self, weak keystrokeController, weak spotlightController, weak captionController] in
+            guard let self, let keystrokeController, let spotlightController, let captionController else { return }
+            self.toggleHideOverlays(keystrokes: keystrokeController, spotlight: spotlightController, captions: captionController)
         }
         modeCoordinator.additionalCaptureExclusions = { [weak self, weak keystrokeController, weak spotlightController, weak captionController] in
             [
@@ -354,6 +364,26 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = item
         classStateChanged(classSession?.inClass ?? false)
         return item
+    }
+
+    /// Control+Option+Command+H: hide everything students can see at once, and
+    /// bring exactly that back on the second press.
+    private func toggleHideOverlays(keystrokes: KeystrokeController, spotlight: SpotlightController,
+                                    captions: CaptionController) {
+        if let hidden = hiddenOverlays {
+            keystrokes.update { $0.enabled = hidden.keystrokes }
+            spotlight.setSpotlight(hidden.spotlight)
+            captions.setEnabled(hidden.captions)
+            hiddenOverlays = nil
+            GlassToast.shared.show(symbol: "eye", title: L10n.t("Overlays back", "已恢復畫面提示"))
+        } else {
+            hiddenOverlays = (keystrokes.settings.enabled, spotlight.spotlightOn, captions.isRunning)
+            keystrokes.update { $0.enabled = false }
+            spotlight.setSpotlight(false)
+            captions.setEnabled(false)
+            GlassToast.shared.show(symbol: "eye.slash", title: L10n.t("All overlays hidden", "已隱藏所有畫面提示"),
+                                   message: L10n.t("Press ⌃⌥⌘H again to bring them back.", "再按 ⌃⌥⌘H 恢復。"))
+        }
     }
 
     @objc private func toggleClass(_ sender: NSMenuItem) {

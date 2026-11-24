@@ -78,6 +78,10 @@ final class CaptionOverlayModel: ObservableObject {
     @Published var fontSize: Double = 30
     @Published var atTop = false
     @Published var status: String?
+    /// Distance from the screen edges, moved so captions never sit on top of
+    /// the keystroke pills or a video call's control bar.
+    @Published var topPadding: CGFloat = 72
+    @Published var bottomPadding: CGFloat = 150
 }
 
 /// Live captions from the microphone (on-device speech recognition when the
@@ -356,6 +360,18 @@ final class CaptionController: NSObject, NSMenuItemValidation {
         return true
     }
 
+    /// Keeps captions clear of the keystroke HUD: `keystrokes` is how far the
+    /// pills reach from their edge, `meetingInset` the room kept for a call's
+    /// control bar.
+    func avoid(keystrokes settings: KeystrokeSettings) {
+        let reach = CGFloat(settings.occupiedHeight)
+        let meeting = CGFloat(settings.avoidMeetingBar ? KeystrokeSettings.meetingBarHeight : 0)
+        let pillsAtTop = settings.enabled && settings.position.isTop
+        let pillsAtBottom = settings.enabled && !settings.position.isTop
+        model.topPadding = max(72, pillsAtTop ? reach + 16 : 0)
+        model.bottomPadding = max(150 + meeting, pillsAtBottom ? reach + 16 : 0)
+    }
+
     private func ensurePanel() {
         if panel == nil {
             let panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
@@ -372,8 +388,7 @@ final class CaptionController: NSObject, NSMenuItemValidation {
             panel.contentView = hosting
             self.panel = panel
         }
-        let mouse = NSEvent.mouseLocation
-        if let screen = NSScreen.screens.first(where: { NSMouseInRect(mouse, $0.frame, false) }) ?? NSScreen.main {
+        if let screen = PresentationDisplay.screen() {
             panel?.setFrame(screen.frame, display: true)
         }
         panel?.orderFrontRegardless()
@@ -502,8 +517,9 @@ struct CaptionOverlayView: View {
             }
         }
         .padding(.horizontal, 80)
-        .padding(.top, 72)
-        .padding(.bottom, 150)
+        .padding(.top, model.topPadding)
+        .padding(.bottom, model.bottomPadding)
+        .animation(.easeOut(duration: 0.25), value: model.bottomPadding)
         .animation(.easeOut(duration: 0.2), value: model.text)
         .allowsHitTesting(false)
     }
