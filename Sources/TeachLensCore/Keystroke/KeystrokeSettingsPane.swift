@@ -12,6 +12,7 @@ struct KeystrokeSettingsPane: View {
     @State private var draft = KeystrokeSettings()
     @State private var didLoad = false
     @StateObject private var recorder = ShortcutRecorder()
+    @StateObject private var customRecorder = KeyComboRecorder()
     @State private var permissionGranted = InputMonitoringPermission.isGranted
     @State private var presentationDisplay: CGDirectDisplayID = PresentationDisplay.selectedID
 
@@ -116,6 +117,53 @@ struct KeystrokeSettingsPane: View {
                 }
             }
             Section {
+                ForEach($draft.customShortcuts) { $entry in
+                    HStack(spacing: 8) {
+                        Text(entry.displayText)
+                            .font(.system(.body, design: .rounded).weight(.semibold))
+                            .frame(minWidth: 64, alignment: .leading)
+                        TextField(L10n.t("Caption", "說明"), text: $entry.label,
+                                  prompt: Text(L10n.t("e.g. Brush tool", "例：筆刷工具")))
+                            .labelsHidden()
+                        TextField(L10n.t("Windows", "Windows 對照"), text: $entry.windows,
+                                  prompt: Text(L10n.t("Windows (optional)", "Windows（選填）")))
+                            .labelsHidden()
+                            .frame(maxWidth: 130)
+                        Button {
+                            draft.customShortcuts.removeAll { $0.id == entry.id }
+                        } label: {
+                            Image(systemName: "minus.circle.fill").foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.borderless)
+                        .help(L10n.t("Remove", "移除"))
+                    }
+                }
+                Button {
+                    if customRecorder.isRecording {
+                        customRecorder.stop()
+                    } else {
+                        customRecorder.start { keys in
+                            if let index = draft.customShortcuts.firstIndex(where: { $0.keySet == Set(keys.map(CustomShortcut.normalized)) }) {
+                                draft.customShortcuts[index].keys = keys
+                            } else {
+                                draft.customShortcuts.append(CustomShortcut(keys: keys))
+                            }
+                        }
+                    }
+                } label: {
+                    Label(customRecorder.isRecording
+                          ? L10n.t("Press the shortcut… (Esc cancels)", "請按下快捷鍵…（Esc 取消）")
+                          : L10n.t("Add shortcut…", "新增快捷鍵…"),
+                          systemImage: customRecorder.isRecording ? "keyboard" : "plus.circle")
+                }
+            } header: {
+                Text(L10n.t("Custom shortcuts", "自訂快捷鍵"))
+            } footer: {
+                Text(L10n.t("Always shown, even single keys such as F5 or B, with your caption under the pill.",
+                            "一律顯示（含 F5、B 等單鍵），並在膠囊下方顯示你寫的說明。"))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
                 LabeledContent(L10n.t("Show/hide shortcut", "開關快捷鍵")) {
                     Button(recorder.isRecording
                            ? L10n.t("Press a shortcut…", "請按快捷鍵…")
@@ -165,7 +213,10 @@ struct KeystrokeSettingsPane: View {
             }
             permissionGranted = InputMonitoringPermission.isGranted
         }
-        .onDisappear { recorder.stop() }
+        .onDisappear {
+            recorder.stop()
+            customRecorder.stop()
+        }
         .onReceive(model.$settings) { latest in
             if latest != draft { draft = latest }
         }
@@ -215,5 +266,53 @@ final class ShortcutRecorder: ObservableObject {
         }
         monitor = nil
         isRecording = false
+    }
+}
+
+/// Captures one key combination for a custom shortcut. Unlike
+/// `ShortcutRecorder` it accepts keys without a modifier (F5, B).
+@MainActor
+final class KeyComboRecorder: ObservableObject {
+    @Published private(set) var isRecording = false
+    private var monitor: Any?
+
+    func start(onRecord: @escaping ([String]) -> Void) {
+        stop()
+        isRecording = true
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            let keyCode = Int(event.keyCode)
+            let flags = event.modifierFlags.rawValue
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if keyCode == kVK_Escape {
+                    self.stop()
+                } else if let keys = Self.keys(keyCode: keyCode, flags: flags) {
+                    onRecord(keys)
+                    self.stop()
+                }
+            }
+            return nil
+        }
+    }
+
+    func stop() {
+        if let monitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        monitor = nil
+        isRecording = false
+    }
+
+    /// Key names for a key press, modifiers first.
+    nonisolated static func keys(keyCode: Int, flags: UInt) -> [String]? {
+        guard let key = KeyCodeMap.name(for: keyCode), !KeyName.modifiers.contains(key) else { return nil }
+        let modifierFlags = NSEvent.ModifierFlags(rawValue: flags)
+        var names: [String] = []
+        if modifierFlags.contains(.control) { names.append(KeyName.controlLeft) }
+        if modifierFlags.contains(.option) { names.append(KeyName.alt) }
+        if modifierFlags.contains(.shift) { names.append(KeyName.shiftLeft) }
+        if modifierFlags.contains(.command) { names.append(KeyName.metaLeft) }
+        names.append(key)
+        return names
     }
 }

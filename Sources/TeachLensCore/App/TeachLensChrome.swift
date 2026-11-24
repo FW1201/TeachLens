@@ -9,7 +9,6 @@ enum TeachLensChrome {
     static let iconWidth: CGFloat = 30
     static let iconHeight: CGFloat = 28
     static let iconCorner: CGFloat = 8
-    static let iconFont = Font.system(size: 14, weight: .medium)
 
     static var liquidGlassAvailable: Bool {
         #if compiler(>=6.2)
@@ -19,6 +18,19 @@ enum TeachLensChrome {
     }
 
     @MainActor static var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+}
+
+/// Scales the chrome icon buttons (the floating toolbar's Small / Medium /
+/// Large setting). 1 is the standard 30 × 28 button.
+private struct ChromeIconScaleKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 1
+}
+
+extension EnvironmentValues {
+    var chromeIconScale: CGFloat {
+        get { self[ChromeIconScaleKey.self] }
+        set { self[ChromeIconScaleKey.self] = newValue }
+    }
 }
 
 /// An icon button: hover and pressed feedback, plus a tinted fill when the
@@ -39,17 +51,19 @@ private struct ChromeIconBody<Label: View>: View {
     let tint: Color
     @State private var hovering = false
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.chromeIconScale) private var scale
 
     var body: some View {
+        let corner = TeachLensChrome.iconCorner * scale
         label
-            .font(TeachLensChrome.iconFont)
+            .font(.system(size: 14 * scale, weight: .medium))
             .foregroundStyle(isOn ? tint : Color.primary)
-            .frame(width: TeachLensChrome.iconWidth, height: TeachLensChrome.iconHeight)
+            .frame(width: TeachLensChrome.iconWidth * scale, height: TeachLensChrome.iconHeight * scale)
             .background(
-                RoundedRectangle(cornerRadius: TeachLensChrome.iconCorner)
+                RoundedRectangle(cornerRadius: corner)
                     .fill(isOn ? tint.opacity(0.22) : Color.primary.opacity(hovering && isEnabled ? 0.09 : 0))
             )
-            .contentShape(RoundedRectangle(cornerRadius: TeachLensChrome.iconCorner))
+            .contentShape(RoundedRectangle(cornerRadius: corner))
             .scaleEffect(isPressed ? 0.9 : 1)
             .opacity(isEnabled ? 1 : 0.35)
             .animation(.easeOut(duration: 0.12), value: isPressed)

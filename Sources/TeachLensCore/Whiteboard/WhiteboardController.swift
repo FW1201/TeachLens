@@ -760,10 +760,10 @@ private struct WhiteboardPagesView: View {
     /// Small renders of every page, made when the popover opens.
     private func render() {
         thumbnails = model.document.pages.map { page in
-            guard let data = WhiteboardRenderer.pngData(page, scale: 0.16), let image = NSImage(data: data) else {
+            guard let image = WhiteboardRenderer.thumbnail(page) else {
                 return NSImage(size: NSSize(width: 256, height: 160))
             }
-            return image
+            return NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
         }
     }
 }

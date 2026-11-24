@@ -71,6 +71,49 @@ enum KeystrokeGlass: String, Codable, CaseIterable, Sendable {
     }
 }
 
+/// A shortcut the teacher adds by hand: always shown (even keys such as F5 or
+/// a single letter that "Shortcuts only" would hide), with an optional
+/// caption under the pill ("Brush tool") and an optional Windows text that
+/// replaces the built-in equivalent.
+struct CustomShortcut: Codable, Equatable, Identifiable, Sendable {
+    var id = UUID()
+    /// Key names (KeyName / KeyCodeMap), modifiers included, e.g. ["MetaLeft", "KeyK"].
+    var keys: [String]
+    var label: String = ""
+    var windows: String = ""
+
+    init(keys: [String], label: String = "", windows: String = "") {
+        self.keys = keys
+        self.label = label
+        self.windows = windows
+    }
+
+    /// Left and right modifiers count as the same key.
+    static func normalized(_ name: String) -> String {
+        switch name {
+        case KeyName.metaRight: return KeyName.metaLeft
+        case KeyName.shiftRight: return KeyName.shiftLeft
+        case KeyName.controlRight: return KeyName.controlLeft
+        default: return name
+        }
+    }
+
+    var keySet: Set<String> { Set(keys.map(Self.normalized)) }
+
+    /// Whether a shown combination is exactly this shortcut.
+    func matches(_ names: [String]) -> Bool {
+        Set(names.map(Self.normalized)) == keySet
+    }
+
+    /// Keys that should start a visible combination even in "Shortcuts only".
+    var leadingKeys: Set<String> {
+        let nonModifiers = keys.map(Self.normalized).filter { !KeyName.modifiers.contains($0) }
+        // With a modifier the combination already shows; without one, every
+        // key of it may lead.
+        return keys.contains(where: { KeyName.modifiers.contains($0) }) ? [] : Set(nonModifiers)
+    }
+}
+
 /// Persisted keystroke-visualization preferences. Decoding tolerates missing
 /// keys so new fields can be added without resetting a user's choices.
 struct KeystrokeSettings: Codable, Equatable, Sendable {
@@ -95,6 +138,8 @@ struct KeystrokeSettings: Codable, Equatable, Sendable {
     var primaryPlatform: KeystrokePlatform = .mac
     /// Keep bottom pills clear of the Zoom / Meet / Teams control bar.
     var avoidMeetingBar = true
+    /// Shortcuts the teacher defined: always shown, with their own caption.
+    var customShortcuts: [CustomShortcut] = []
     /// Global toggle hotkey: virtual key code and NSEvent modifier raw value.
     /// Defaults to Control+0 (ZoomIt uses Control+1 … Control+9).
     var toggleKeyCode = 29
@@ -129,14 +174,15 @@ struct KeystrokeSettings: Codable, Equatable, Sendable {
             maxHistory: max(1, maxHistory),
             showMouseEvents: showMouseEvents,
             lingerDuration: max(0.5, lingerSeconds),
-            dragThreshold: dragThreshold
+            dragThreshold: dragThreshold,
+            extraKeys: customShortcuts.reduce(into: Set<String>()) { $0.formUnion($1.leadingKeys) }
         )
     }
 
     private enum CodingKeys: String, CodingKey {
         case enabled, filter, allowedKeys, showHistory, maxHistory, showMouseEvents, showClickRipples
         case lingerSeconds, dragThreshold, position, glass, scale, margin, toggleKeyCode, toggleModifiers
-        case windowsEquivalent, primaryPlatform, avoidMeetingBar
+        case windowsEquivalent, primaryPlatform, avoidMeetingBar, customShortcuts
     }
 
     init(from decoder: Decoder) throws {
@@ -158,6 +204,7 @@ struct KeystrokeSettings: Codable, Equatable, Sendable {
         windowsEquivalent = try c.decodeIfPresent(Bool.self, forKey: .windowsEquivalent) ?? d.windowsEquivalent
         primaryPlatform = (try? c.decodeIfPresent(KeystrokePlatform.self, forKey: .primaryPlatform)) ?? d.primaryPlatform
         avoidMeetingBar = try c.decodeIfPresent(Bool.self, forKey: .avoidMeetingBar) ?? d.avoidMeetingBar
+        customShortcuts = (try? c.decodeIfPresent([CustomShortcut].self, forKey: .customShortcuts)) ?? d.customShortcuts
         toggleKeyCode = try c.decodeIfPresent(Int.self, forKey: .toggleKeyCode) ?? d.toggleKeyCode
         toggleModifiers = try c.decodeIfPresent(UInt.self, forKey: .toggleModifiers) ?? d.toggleModifiers
     }

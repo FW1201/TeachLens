@@ -55,6 +55,9 @@ struct KeystrokeEngineConfig: Equatable, Sendable {
     var soloModifierDelay: TimeInterval = 0.35
     /// How long a modifier that was held on its own stays after release.
     var soloModifierLinger: TimeInterval = 1.0
+    /// Keys the teacher added as custom shortcuts; they start a visible
+    /// combination whatever the filter says.
+    var extraKeys: Set<String> = []
 }
 
 struct KeystrokeEngine: Sendable {
@@ -179,6 +182,7 @@ struct KeystrokeEngine: Sendable {
 
     private func ignore(_ pressed: [String]) -> Bool {
         guard let first = pressed.first else { return true }
+        if config.extraKeys.contains(CustomShortcut.normalized(first)) { return false }
         switch config.filter {
         case .none:
             return false
@@ -264,10 +268,14 @@ struct KeystrokeEngine: Sendable {
     /// leaves after `soloModifierLinger`, so typing ⌘C never flashes "⌘" first
     /// and a quick ⌘ tap shows nothing at all. Holding ⌥ to explain it still
     /// shows it.
+    ///
+    /// With the shortcuts filter, modifiers alone never show: the HUD appears
+    /// only once a full combination (modifier plus another key) is pressed.
     func visibleGroups(at now: TimeInterval) -> [KeystrokeGroup] {
         groups.filter { group in
             guard !group.keys.isEmpty,
                   group.keys.allSatisfy({ KeyName.modifiers.contains($0.name) }) else { return true }
+            if config.filter == .modifiers { return false }
             let held = group.keys.filter { pressedKeys.contains($0.name) }
             if let firstHeld = held.map(\.pressStartedAt).min() {
                 return now - firstHeld >= config.soloModifierDelay

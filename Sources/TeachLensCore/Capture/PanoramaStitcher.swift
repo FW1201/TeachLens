@@ -197,46 +197,6 @@ public enum PanoramaStitcher {
         return (out, dw, dh)
     }
 
-    /// Per-row sum of horizontal gradient magnitude (length `h`). Rows with
-    /// text/edges score high; flat background rows score ~0.
-    static func rowEdgeDensity(_ luma: [UInt8], _ w: Int, _ h: Int) -> [Int] {
-        let marginX = max(2, w / 20)
-        var density = [Int](repeating: 0, count: h)
-        luma.withUnsafeBufferPointer { src in
-            let end = w - marginX - 1
-            for y in 0..<h {
-                let row = y * w
-                var sum = 0
-                var x = marginX
-                while x < end {
-                    sum += abs(Int(src[row + x + 1]) - Int(src[row + x]))
-                    x += 1
-                }
-                density[y] = sum
-            }
-        }
-        return density
-    }
-
-    /// Per-column sum of vertical gradient magnitude (length `w`).
-    static func colEdgeDensity(_ luma: [UInt8], _ w: Int, _ h: Int) -> [Int] {
-        let marginY = max(2, h / 20)
-        var density = [Int](repeating: 0, count: w)
-        luma.withUnsafeBufferPointer { src in
-            let end = h - marginY - 1
-            for x in 0..<w {
-                var sum = 0
-                var y = marginY
-                while y < end {
-                    sum += abs(Int(src[(y + 1) * w + x]) - Int(src[y * w + x]))
-                    y += 1
-                }
-                density[x] = sum
-            }
-        }
-        return density
-    }
-
     static func regionEdgeEnergy(_ luma: [UInt8], _ w: Int, _ h: Int, yRange: Range<Int>) -> Int {
         guard luma.count == w * h, w > 2, h > 2 else { return 0 }
         let startY = max(1, yRange.lowerBound)
@@ -473,61 +433,6 @@ public enum PanoramaStitcher {
         }
         guard bestShift.dx != 0 || bestShift.dy != 0 else { return false }
         return best + 2 <= stationary && best * 100 <= stationary * 85 && best <= 25
-    }
-
-    /// 1D Normalized Cross-Correlation over `n` elements, comparing
-    /// `a[aOff + k]` with `b[bOff + k]`. Returns a value in [-1, 1], or 0 if
-    /// either window has zero variance. Port of `NCC1D`.
-    static func ncc(_ a: [Int], _ aOff: Int, _ b: [Int], _ bOff: Int, _ n: Int) -> Double {
-        if n <= 0 { return 0 }
-        var sumA = 0.0, sumB = 0.0, sumAB = 0.0, sumA2 = 0.0, sumB2 = 0.0
-        a.withUnsafeBufferPointer { pa in
-            b.withUnsafeBufferPointer { pb in
-                var k = 0
-                while k < n {
-                    let av = Double(pa[aOff + k])
-                    let bv = Double(pb[bOff + k])
-                    sumA += av; sumB += bv
-                    sumAB += av * bv
-                    sumA2 += av * av; sumB2 += bv * bv
-                    k += 1
-                }
-            }
-        }
-        let N = Double(n)
-        let varA = sumA2 / N - (sumA / N) * (sumA / N)
-        let varB = sumB2 / N - (sumB / N) * (sumB / N)
-        if varA <= 0 || varB <= 0 { return 0 }
-        let cov = sumAB / N - (sumA / N) * (sumB / N)
-        return cov / (varA * varB).squareRoot()
-    }
-
-    /// Find the shift `s` in `[lo, hi]` that best aligns the two 1D signals,
-    /// where `cur[k]` is matched against `prev[k + s]`.
-    static func bestShift1D(prev: [Int], cur: [Int], lo: Int, hi: Int, minOverlap: Int, minAbsShift: Int = 0) -> (shift: Int, score: Double)? {
-        let length = prev.count
-        guard cur.count == length, lo <= hi else { return nil }
-        var bestShift = 0
-        var bestScore = -2.0
-        var found = false
-        var s = lo
-        while s <= hi {
-            if abs(s) < minAbsShift {
-                s += 1
-                continue
-            }
-            let n = length - abs(s)
-            if n >= minOverlap {
-                let score = s >= 0 ? ncc(cur, 0, prev, s, n) : ncc(cur, -s, prev, 0, n)
-                if score > bestScore {
-                    bestScore = score
-                    bestShift = s
-                    found = true
-                }
-            }
-            s += 1
-        }
-        return found ? (bestShift, bestScore) : nil
     }
 
     /// Mean absolute luma difference over the overlap when `cur` is offset by
@@ -931,8 +836,6 @@ public enum PanoramaStitcher {
     }
 
     // MARK: - Shift search
-
-    private static let nccThreshold = 0.30
 
     // MARK: - Fixed overlay detection
 

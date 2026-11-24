@@ -22,6 +22,8 @@ struct KeystrokeDisplayGroup: Identifiable, Equatable {
     /// True when `modifierGlyphs` holds words ("Ctrl + Shift") rather than
     /// Mac glyphs, so the pill uses a smaller, unspaced font.
     var modifiersAreWords = false
+    /// The teacher's caption for a custom shortcut ("Brush tool").
+    var customLabel: String?
 
     /// The Mac combination as one line, written the way macOS menus do:
     /// "⇧⌘4", "⌘Click".
@@ -48,7 +50,11 @@ struct KeystrokeDisplayGroup: Identifiable, Equatable {
         return converted
     }
 
-    static func make(from group: KeystrokeGroup, index: Int) -> KeystrokeDisplayGroup {
+    static func make(
+        from group: KeystrokeGroup,
+        index: Int,
+        custom: [CustomShortcut] = []
+    ) -> KeystrokeDisplayGroup {
         let ordered = KeyName.displayOrder(group.keys.map(\.name))
         var glyphs = ""
         var chips: [KeystrokeChip] = []
@@ -77,13 +83,21 @@ struct KeystrokeDisplayGroup: Identifiable, Equatable {
             ))
         }
         let lastCount = group.keys.last?.pressedCount ?? 1
-        return KeystrokeDisplayGroup(
+        let names = group.keys.map(\.name)
+        var result = KeystrokeDisplayGroup(
             id: "\(index)-\(group.createdAt)",
             modifierGlyphs: glyphs,
             chips: chips,
             count: lastCount,
-            windowsText: WindowsEquivalent.text(for: group.keys.map(\.name))
+            windowsText: WindowsEquivalent.text(for: names)
         )
+        if let match = custom.first(where: { $0.matches(names) }) {
+            let label = match.label.trimmingCharacters(in: .whitespaces)
+            result.customLabel = label.isEmpty ? nil : label
+            let windows = match.windows.trimmingCharacters(in: .whitespaces)
+            if !windows.isEmpty { result.windowsText = windows }
+        }
+        return result
     }
 }
 
@@ -222,6 +236,21 @@ struct KeystrokeComboView: View {
         let windowsFirst = primary == .windows ? group.windowsPrimary() : nil
         VStack(alignment: alignment, spacing: 5 * s) {
             KeystrokePillView(group: windowsFirst ?? group, scale: s, glass: glass)
+            if let label = group.customLabel {
+                HStack(spacing: 6 * s) {
+                    Image(systemName: "text.bubble")
+                        .font(.system(size: 12 * s, weight: .semibold))
+                    Text(label)
+                        .font(.system(size: 15 * s, weight: .semibold, design: .rounded))
+                        .lineLimit(1)
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12 * s)
+                .padding(.vertical, 6 * s)
+                .background(Capsule().fill(Color(red: 0.42, green: 0.25, blue: 0.78).opacity(0.9)))
+                .overlay(Capsule().strokeBorder(Color.white.opacity(0.25), lineWidth: 1))
+                .fixedSize()
+            }
             if showWindows, windowsFirst != nil {
                 HStack(spacing: 6 * s) {
                     Image(systemName: "laptopcomputer")
@@ -320,12 +349,7 @@ struct KeystrokePillView: View {
 /// and macOS 26 at run time; otherwise the HUD falls back to a frosted
 /// material. When "Reduce transparency" is on, the opaque style is used.
 enum KeystrokeGlassSupport {
-    static var isLiquidGlassAvailable: Bool {
-        #if compiler(>=6.2)
-        if #available(macOS 26.0, *) { return true }
-        #endif
-        return false
-    }
+    static var isLiquidGlassAvailable: Bool { TeachLensChrome.liquidGlassAvailable }
 }
 
 struct KeystrokePillBackground: ViewModifier {
@@ -414,5 +438,24 @@ struct ClickRippleView: View {
                     expanded = true
                 }
             }
+    }
+}
+
+extension CustomShortcut {
+    /// The combination written the way macOS menus do ("⌘K", "F5").
+    var displayText: String {
+        var glyphs = ""
+        var rest: [String] = []
+        for name in KeyName.displayOrder(keys) {
+            let display = KeyDisplayMap.display(for: name)
+            if display.isModifier {
+                glyphs += display.glyph ?? display.compactLabel
+            } else if display.category == .arrow {
+                rest.append(display.glyph ?? display.label)
+            } else {
+                rest.append(display.label)
+            }
+        }
+        return glyphs + rest.joined(separator: " ")
     }
 }
