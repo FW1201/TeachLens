@@ -8,6 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/FW1201/TeachLens/releases/latest">⬇︎ 下載最新版</a> ·
+  <a href="#測試版介面">測試版介面</a> ·
   <a href="#安裝">安裝</a> ·
   <a href="#快速上手">快速上手</a> ·
   <a href="#功能說明">功能說明</a> ·
@@ -29,8 +30,17 @@
 - **自動上字幕**：講話即時轉成字幕，課後匯出 .srt 逐字稿。
 - **一鍵切換課程情境**：講解、程式示範、重點強調、休息。
 
-<!-- 截圖：06-keystrokes-hud.png（主視覺） -->
-<p align="center"><img src="docs/screenshots/06-keystrokes-hud.png" width="720" alt="按鍵顯示畫面（待補截圖）"></p>
+---
+
+## 測試版介面
+
+以下畫面擷取自 macOS 上的 **TeachLens 1.3.0-beta.3 開發建置**（`fa59335`）。正式版與已發布的測試版可在 GitHub Releases 下載。[正式版](https://github.com/FW1201/TeachLens/releases/latest) · [所有版本](https://github.com/FW1201/TeachLens/releases)
+
+### 多頁白板
+
+上方工具列可選擇畫筆、形狀、顏色和匯出方式，下方可切換或新增頁面。詳見[多頁白板功能](#7-多頁白板whiteboard)。
+
+<p align="center"><img src="docs/screenshots/19-whiteboard.png" width="820" alt="TeachLens 測試版白板，上方是繪圖工具列，下方是頁碼和新增頁面的控制項"></p>
 
 ---
 
@@ -55,9 +65,6 @@
 
 打開 DMG，把 **TeachLens** 拖到 **Applications（應用程式）**。
 
-<!-- 截圖：01-dmg-window.png -->
-<p align="center"><img src="docs/screenshots/01-dmg-window.png" width="560" alt="DMG 視窗（待補截圖）"></p>
-
 ### 3. 第一次開啟（略過 Gatekeeper）
 
 TeachLens 是開源免費版本，沒有付費向 Apple 公證，第一次開啟會被系統擋下。任選一種方式：
@@ -73,9 +80,6 @@ TeachLens 是開源免費版本，沒有付費向 Apple 公證，第一次開啟
   ```
 
 > macOS 15 Sequoia 以後，「右鍵 ▸ 打開」已無法略過這個限制，請用上面兩種方法。macOS 14 仍可用右鍵 ▸ 打開。
-
-<!-- 截圖：02-gatekeeper-open.png -->
-<p align="center"><img src="docs/screenshots/02-gatekeeper-open.png" width="420" alt="系統設定的強制打開按鈕（待補截圖）"></p>
 
 > 若出現「已損毀，無法打開」，同樣用方法 B 解決；這是未公證 App 的系統提示，不是檔案真的壞掉。
 
@@ -93,12 +97,6 @@ TeachLens 會在需要時請求權限，也可以從選單列 **TeachLens ▸ Ch
 
 **開啟「螢幕錄製」或「輸入監控」後，請結束並重新打開 TeachLens 才會生效。**
 
-<!-- 截圖：03-permissions-dialog.png、04-input-monitoring.png -->
-<p align="center">
-  <img src="docs/screenshots/03-permissions-dialog.png" width="380" alt="權限對話框（待補截圖）">
-  <img src="docs/screenshots/04-input-monitoring.png" width="380" alt="輸入監控設定（待補截圖）">
-</p>
-
 ### 更新與移除
 
 - **更新**：下載新版 DMG，覆蓋「應用程式」裡的 TeachLens 即可，設定會保留。
@@ -109,9 +107,6 @@ TeachLens 會在需要時請求權限，也可以從選單列 **TeachLens ▸ Ch
 ## 快速上手
 
 TeachLens 沒有 Dock 圖示，執行後在**畫面右上角選單列**出現金色放大鏡圖示，所有功能都在這裡。
-
-<!-- 截圖：05-menu-bar.png -->
-<p align="center"><img src="docs/screenshots/05-menu-bar.png" width="360" alt="選單列選單（待補截圖）"></p>
 
 第一次開啟會出現 **3 步驟新手引導**：
 1. 選擇學生主要用 Mac 或 Windows。
@@ -178,9 +173,6 @@ TeachLens 沒有 Dock 圖示，執行後在**畫面右上角選單列**出現金
 - **課程模式試用**：逐一套用四種模式，最後按「回到原本設定」還原。
 - **快捷鍵接收測試**：按任一 TeachLens 快捷鍵，這裡會顯示收到的功能名稱；沒有出現代表快捷鍵沒有送到 TeachLens（可能被其他 App 佔用）。
 
-<!-- 截圖：20-check-and-test.png -->
-<p align="center"><img src="docs/screenshots/20-check-and-test.png" width="560" alt="總覽與測試（待補截圖）"></p>
-
 ## 功能說明
 
 ### 1. 按鍵顯示（Keystrokes）
@@ -199,12 +191,6 @@ TeachLens 沒有 Dock 圖示，執行後在**畫面右上角選單列**出現金
 - 滑鼠：⌘ 點擊、⌥ 拖曳、滾輪都會顯示；點擊位置出現漣漪（左鍵白色、右鍵橘色）。
 - 預設只顯示「快捷鍵」（有修飾鍵的組合），打字內容不會露出；改成「每個鍵」前會先提醒，避免分享螢幕時露出私人內容。
 - 背景三選一：**Liquid Glass**（macOS 26+）、霧面、實色（錄影或背景很花時最清楚）。
-
-<!-- 截圖：06-keystrokes-hud.png、08-keystrokes-settings.png -->
-<p align="center">
-  <img src="docs/screenshots/06-keystrokes-hud.png" width="420" alt="按鍵膠囊（待補截圖）">
-  <img src="docs/screenshots/08-keystrokes-settings.png" width="380" alt="Keystrokes 設定（待補截圖）">
-</p>
 
 **設定位置**：選單列 ▸ Keystroke Options，或 Settings ▸ Keystrokes（位置、大小、停留秒數、歷史筆數、快捷鍵）。
 
@@ -238,9 +224,6 @@ TeachLens 沒有 Dock 圖示，執行後在**畫面右上角選單列**出現金
 - 改成 Windows 為主時，就算沒開對照也會生效；開啟對照後，下方才會加上 Mac 寫法。
 - **設定位置**：Settings ▸ Keystrokes ▸ 主要顯示（Mac／Windows），或選單列 ▸ Keystroke Options ▸「Mac 為主、Windows 為輔」／「Windows 為主、Mac 為輔」。
 
-<!-- 截圖：07-windows-equivalent.png -->
-<p align="center"><img src="docs/screenshots/07-windows-equivalent.png" width="520" alt="Windows 對照（待補截圖）"></p>
-
 ### 3. 聚光燈與游標強調（Spotlight）
 
 - **聚光燈（⌃⇧0）**：畫面變暗，只亮滑鼠周圍；形狀可選圓形或「寬條」（適合逐行讀文字）。
@@ -248,12 +231,6 @@ TeachLens 沒有 Dock 圖示，執行後在**畫面右上角選單列**出現金
 - **搖動找游標**：左右快速搖動滑鼠，游標位置會出現放大光圈。
 
 調整：選單列 ▸ Spotlight Options，或 Settings ▸ Spotlight（大小、暗度、顏色、快捷鍵）。
-
-<!-- 截圖：09-spotlight.png、10-cursor-highlight.png -->
-<p align="center">
-  <img src="docs/screenshots/09-spotlight.png" width="400" alt="聚光燈（待補截圖）">
-  <img src="docs/screenshots/10-cursor-highlight.png" width="400" alt="游標強調（待補截圖）">
-</p>
 
 ### 4. 放大鏡與畫筆標註（Zoom & Draw）
 
@@ -270,24 +247,12 @@ TeachLens 沒有 Dock 圖示，執行後在**畫面右上角選單列**出現金
 | ⌘C／⌘S | 複製／儲存目前畫面 |
 | Esc 或右鍵 | 離開 |
 
-<!-- 截圖：11-static-zoom.png、12-live-zoom.png -->
-<p align="center">
-  <img src="docs/screenshots/11-static-zoom.png" width="400" alt="靜態放大與標註（待補截圖）">
-  <img src="docs/screenshots/12-live-zoom.png" width="400" alt="即時放大（待補截圖）">
-</p>
-
 ### 5. 即時字幕與逐字稿（Live Captions）
 
 - 按 **⌃⇧C** 開始，畫面下方即時顯示你說的話（兩行）；停頓後自動斷句。
 - 語言：中文（台灣）、中文（简体）、English、日本語、한국어；支援的語言會在 Mac 本機辨識，不上傳雲端。
 - **匯出**：字幕選項 ▸ 匯出逐字稿（.srt／.vtt／.txt）。
 - **錄影字幕**：錄影時開著字幕，錄完選 **匯出上一段錄影的字幕（.srt）**，時間軸會對齊影片開頭，可直接匯入剪輯軟體或 YouTube。
-
-<!-- 截圖：13-captions.png、14-caption-export.png -->
-<p align="center">
-  <img src="docs/screenshots/13-captions.png" width="420" alt="即時字幕（待補截圖）">
-  <img src="docs/screenshots/14-caption-export.png" width="360" alt="匯出逐字稿（待補截圖）">
-</p>
 
 ### 6. 課程模式（Course Modes）
 
@@ -303,9 +268,6 @@ TeachLens 沒有 Dock 圖示，執行後在**畫面右上角選單列**出現金
 - **自訂模式**：調好設定後選 **將目前設定存成模式…**。
 - **分享模式**：**匯出模式…** 產生 JSON 檔，其他老師用 **匯入模式…** 載入。
 - 重開 TeachLens 會回到上次的模式（不會自動開麥克風或計時器）。
-
-<!-- 截圖：15-course-modes.png -->
-<p align="center"><img src="docs/screenshots/15-course-modes.png" width="520" alt="課程模式（待補截圖）"></p>
 
 ### 7. 多頁白板（Whiteboard）
 
@@ -326,9 +288,6 @@ TeachLens 沒有 Dock 圖示，執行後在**畫面右上角選單列**出現金
 - **匯出**：全部頁面存成一個 PDF，或本頁存成 PNG。
 - 白板內容在背景自動保存，結束 App 時也會存檔；下次打開會接續上次的頁面與視窗位置。
 
-<!-- 截圖：19-whiteboard.png -->
-<p align="center"><img src="docs/screenshots/19-whiteboard.png" width="560" alt="多頁白板（待補截圖）"></p>
-
 ### 8. 休息計時器、課堂倒數、截圖、錄影
 
 - **⌃⇧T 課堂倒數**：在分享螢幕右上角顯示小型玻璃計時（預設 3 分鐘，工具列「計時」可選 1／3／5 分鐘），不遮住畫面。學生看得到；時間到會變紅、響一聲，5 秒後消失。
@@ -337,12 +296,6 @@ TeachLens 沒有 Dock 圖示，執行後在**畫面右上角選單列**出現金
 - **⌃6 截圖**：拖曳範圍複製到剪貼簿；⌃⇧6 存檔；⌃⌥6 辨識文字（OCR）。
 - **⌃8 長截圖**：選取範圍後捲動，自動拼接成一張長圖。
 - **⌃5 錄影**：全螢幕或區域（⌃⇧5），可收系統聲音、麥克風、加相機子母畫面；結束後可剪輯、淡入淡出再存檔。按鍵顯示與畫筆標註都會錄進影片。
-
-<!-- 截圖：16-break-timer.png、17-recording-editor.png -->
-<p align="center">
-  <img src="docs/screenshots/16-break-timer.png" width="400" alt="休息計時器（待補截圖）">
-  <img src="docs/screenshots/17-recording-editor.png" width="400" alt="錄影剪輯（待補截圖）">
-</p>
 
 ### 9. 圖形工具列（浮動工具列）
 
@@ -391,7 +344,7 @@ App Store 版必須放進沙盒，會失去 DemoType 等功能，審核也較慢
 
 **Fork 開發：[數位敘事力期刊 Journal of Digital Narrative](https://www.facebook.com/Journal.of.Digital.Narrative)**
 
-TeachLens 由兩個開源專案改作而成：
+TeachLens 的 macOS 應用程式主體改作自 Microsoft 的 ZoomIt for Mac。按鍵與滑鼠顯示功能源自 Rahul Mula 的 Keyviz，並以 Swift 重新實作。GitHub 上的儲存庫源自 Keyviz。
 
 | 專案 | 作者 | 授權 | 用途 |
 |---|---|---|---|
@@ -400,7 +353,4 @@ TeachLens 由兩個開源專案改作而成：
 
 TeachLens 整體以 **GNU GPL-3.0** 授權（[LICENSE](LICENSE)），ZoomIt for Mac 的 MIT 授權全文見 [ThirdParty/ZoomIt-Mac-LICENSE.txt](ThirdParty/ZoomIt-Mac-LICENSE.txt)，完整說明見 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。TeachLens 與 Microsoft、Sysinternals、Keyviz 專案無隸屬或背書關係。
 
-<!-- 截圖：18-settings-about.png -->
-<p align="center"><img src="docs/screenshots/18-settings-about.png" width="420" alt="設定視窗出處（待補截圖）"></p>
-
-開發、建置與發佈流程請見 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)；截圖待補清單見 [docs/screenshots/README.md](docs/screenshots/README.md)。
+開發、建置與發佈流程請見 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)；截圖版本與補拍清單見 [docs/screenshots/README.md](docs/screenshots/README.md)。
