@@ -16,6 +16,9 @@ enum KeystrokeSelfTests {
         try testHistoryModeKeepsRecentGroups()
         try testReleasedKeysExpireAfterLinger()
         try testHeldKeysDoNotExpire()
+        try testSoloModifierWaitsBeforeShowing()
+        try testCombinationExpiresAsAWhole()
+        try testReleasedKeyLeavesCombination()
         try testModifierClickAndDrag()
         try testScrollReleasesAfterLinger()
         try testSettingsRoundTripAndDefaults()
@@ -142,6 +145,54 @@ enum KeystrokeSelfTests {
         try expect(!e.tick(at: 0.5), "Nothing should expire before the linger time")
         try expect(e.tick(at: 1.5), "Keys should expire after the linger time")
         try expect(e.groups.isEmpty, "All groups should be gone")
+    }
+
+    private static func testSoloModifierWaitsBeforeShowing() throws {
+        // Typing ⌘C quickly never shows a lone ⌘ first.
+        var e = engine()
+        e.keyDown(KeyName.metaLeft, at: 0)
+        try expect(e.visibleGroups(at: 0.1).isEmpty, "A just-pressed ⌘ should not show yet")
+        e.keyDown("KeyC", at: 0.12)
+        try expect(names(e.visibleGroups(at: 0.12).last) == [KeyName.metaLeft, "KeyC"], "⌘C should show at once")
+
+        // A quick tap of ⌘ on its own shows nothing at all.
+        var tap = engine()
+        tap.keyDown(KeyName.metaLeft, at: 0)
+        tap.keyUp(KeyName.metaLeft, at: 0.1)
+        try expect(tap.visibleGroups(at: 0.2).isEmpty, "A quick ⌘ tap should not show")
+
+        // Holding ⌥ to explain it shows it, briefly after release, then hides.
+        var hold = engine { $0.lingerDuration = 3 }
+        hold.keyDown(KeyName.alt, at: 0)
+        try expect(names(hold.visibleGroups(at: 0.5).last) == [KeyName.alt], "A held ⌥ should show")
+        hold.keyUp(KeyName.alt, at: 1.0)
+        try expect(!hold.visibleGroups(at: 1.5).isEmpty, "A held ⌥ should stay briefly after release")
+        try expect(hold.visibleGroups(at: 2.5).isEmpty, "A lone ⌥ should not use the full linger time")
+    }
+
+    private static func testCombinationExpiresAsAWhole() throws {
+        var e = engine { $0.lingerDuration = 1 }
+        e.keyDown(KeyName.metaLeft, at: 0)
+        e.keyDown("KeyZ", at: 0.1)
+        e.keyUp("KeyZ", at: 0.2)
+        e.tick(at: 5)
+        try expect(names(e.visibleGroups(at: 5).last) == [KeyName.metaLeft, "KeyZ"],
+                   "Holding ⌘ after ⌘Z should keep ⌘Z, got \(names(e.visibleGroups(at: 5).last))")
+        e.keyUp(KeyName.metaLeft, at: 5)
+        e.tick(at: 5.5)
+        try expect(!e.groups.isEmpty, "The combination should linger after release")
+        e.tick(at: 6.5)
+        try expect(e.groups.isEmpty, "The combination should leave together")
+    }
+
+    private static func testReleasedKeyLeavesCombination() throws {
+        var e = engine()
+        e.keyDown(KeyName.metaLeft, at: 0)
+        e.keyDown("KeyZ", at: 0.1)
+        e.keyUp("KeyZ", at: 0.2)
+        e.keyDown("KeyX", at: 0.4)
+        try expect(names(e.groups.last) == [KeyName.metaLeft, "KeyX"],
+                   "Hold ⌘, Z, then X should show ⌘X, got \(names(e.groups.last))")
     }
 
     private static func testHeldKeysDoNotExpire() throws {

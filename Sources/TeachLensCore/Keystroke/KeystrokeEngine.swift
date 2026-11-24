@@ -11,12 +11,16 @@ import Foundation
 struct KeystrokeKey: Equatable, Sendable {
     var name: String
     var pressedCount: Int
+    /// The last press or release of this key.
     var lastPressedAt: TimeInterval
+    /// When the current (or most recent) press began.
+    var pressStartedAt: TimeInterval
 
     init(name: String, at time: TimeInterval) {
         self.name = name
         self.pressedCount = 1
         self.lastPressedAt = time
+        self.pressStartedAt = time
     }
 }
 
@@ -46,6 +50,11 @@ struct KeystrokeEngineConfig: Equatable, Sendable {
     var lingerDuration: TimeInterval = 3
     /// Points the pointer must travel with a button held before it counts as a drag.
     var dragThreshold: Double = 50
+    /// A modifier pressed on its own (⌘ before ⌘C, or a ⌘-click) is only shown
+    /// once it has been held this long, so quick taps don't flash a lone ⌘.
+    var soloModifierDelay: TimeInterval = 0.35
+    /// How long a modifier that was held on its own stays after release.
+    var soloModifierLinger: TimeInterval = 1.0
 }
 
 struct KeystrokeEngine: Sendable {
@@ -119,6 +128,7 @@ struct KeystrokeEngine: Sendable {
                         var bumped = gKey
                         bumped.pressedCount += 1
                         bumped.lastPressedAt = now
+                        bumped.pressStartedAt = now
                         groupKeys.append(bumped)
                     } else if pressed.contains(gKey.name) {
                         groupKeys.append(gKey)
@@ -142,6 +152,9 @@ struct KeystrokeEngine: Sendable {
                 groupKeys.append(key)
                 groups.append(KeystrokeGroup(keys: groupKeys, createdAt: createdAt))
             } else {
+                // Keys released since (Z in "hold ⌘, Z, then X") are no longer
+                // part of the combination.
+                groups[last].keys.removeAll { !pressed.contains($0.name) }
                 groups[last].keys.append(key)
             }
         }
@@ -244,6 +257,27 @@ struct KeystrokeEngine: Sendable {
         }
     }
 
+    // MARK: Display timing
+
+    /// The groups to draw at `now`. A group of modifiers only (nothing pressed
+    /// with them yet) waits for `soloModifierDelay` before it appears and
+    /// leaves after `soloModifierLinger`, so typing ⌘C never flashes "⌘" first
+    /// and a quick ⌘ tap shows nothing at all. Holding ⌥ to explain it still
+    /// shows it.
+    func visibleGroups(at now: TimeInterval) -> [KeystrokeGroup] {
+        groups.filter { group in
+            guard !group.keys.isEmpty,
+                  group.keys.allSatisfy({ KeyName.modifiers.contains($0.name) }) else { return true }
+            let held = group.keys.filter { pressedKeys.contains($0.name) }
+            if let firstHeld = held.map(\.pressStartedAt).min() {
+                return now - firstHeld >= config.soloModifierDelay
+            }
+            let longestHold = group.keys.map { $0.lastPressedAt - $0.pressStartedAt }.max() ?? 0
+            let released = group.keys.map(\.lastPressedAt).max() ?? 0
+            return longestHold >= config.soloModifierDelay && now - released < config.soloModifierLinger
+        }
+    }
+
     // MARK: Time
 
     /// Expires released keys and scroll gestures. Returns true when `groups`
@@ -259,16 +293,13 @@ struct KeystrokeEngine: Sendable {
             self.lastScrollAt = nil
         }
 
-        var updated: [KeystrokeGroup] = []
-        for group in groups {
-            let keys = group.keys.filter { key in
-                pressedKeys.contains(key.name) || now - key.lastPressedAt < config.lingerDuration
-            }
-            if !keys.isEmpty {
-                updated.append(KeystrokeGroup(keys: keys, createdAt: group.createdAt))
-            }
+        // A combination leaves as a whole: it stays while any of its keys is
+        // held and for `lingerDuration` after the last one is released, so
+        // holding ⌘ after ⌘Z doesn't shrink the pill to a lone "⌘".
+        groups = groups.filter { group in
+            group.keys.contains { pressedKeys.contains($0.name) }
+                || now - (group.keys.map(\.lastPressedAt).max() ?? 0) < config.lingerDuration
         }
-        groups = updated
         return groups != before
     }
 }

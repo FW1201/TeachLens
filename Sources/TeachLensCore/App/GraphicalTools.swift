@@ -53,6 +53,16 @@ final class GraphicalTools: ObservableObject {
     private var enabled = false
     private var captureActive = false
     private var outsideClickMonitor: Any?
+    /// The panel's frame is tall while the column is open or animating closed;
+    /// `expanded` drives what the view shows.
+    private var panelTall = false
+
+    /// The column slides up from the launcher; with Reduce Motion it fades.
+    static var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+    private static var openAnimation: Animation {
+        reduceMotion ? .easeOut(duration: 0.12) : .spring(response: 0.3, dampingFraction: 0.86)
+    }
+    private static let closeDuration: TimeInterval = 0.18
 
     init(teaching: TeachingControllers) {
         self.teaching = teaching
@@ -133,7 +143,7 @@ final class GraphicalTools: ObservableObject {
             ?? NSScreen.main
         guard let bounds = screen?.visibleFrame else { return }
         let clamped = GraphicalToolsLayout.clampedOrigin(origin, in: bounds)
-        let height = expanded
+        let height = panelTall
             ? GraphicalToolsLayout.expandedHeight(originY: clamped.y, in: bounds)
             : GraphicalToolsLayout.collapsedHeight
         panel.setFrame(NSRect(x: clamped.x, y: clamped.y, width: GraphicalToolsLayout.width, height: height),
@@ -176,8 +186,10 @@ final class GraphicalTools: ObservableObject {
     private func expand() {
         guard let panel else { return }
         refreshState()
-        expanded = true
+        // Grow the window first so the column has room to animate into.
+        panelTall = true
         place(at: panel.frame.origin)
+        withAnimation(Self.openAnimation) { expanded = true }
         panel.makeKey()
         if outsideClickMonitor == nil {
             outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(
@@ -194,8 +206,16 @@ final class GraphicalTools: ObservableObject {
             self.outsideClickMonitor = nil
         }
         guard expanded else { return }
-        expanded = false
-        if let panel { place(at: panel.frame.origin) }
+        withAnimation(.easeIn(duration: Self.closeDuration)) { expanded = false }
+        // Shrink the window once the column has finished leaving, unless it was
+        // opened again meanwhile.
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.closeDuration) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, !self.expanded, self.panelTall else { return }
+                self.panelTall = false
+                if let panel = self.panel { self.place(at: panel.frame.origin) }
+            }
+        }
     }
 
     // MARK: Commands and live state
@@ -244,6 +264,9 @@ private struct GraphicalToolsView: View {
         VStack(spacing: 5) {
             if tools.expanded {
                 column
+                    .transition(GraphicalTools.reduceMotion
+                        ? .opacity
+                        : .move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.92, anchor: .bottom)))
             }
             launcher
                 .frame(height: 50)

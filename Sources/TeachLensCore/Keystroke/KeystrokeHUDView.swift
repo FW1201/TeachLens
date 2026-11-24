@@ -79,6 +79,7 @@ final class KeystrokeOverlayModel: ObservableObject {
 
 struct KeystrokeHUDView: View {
     @ObservedObject var model: KeystrokeOverlayModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let settings = model.settings
@@ -99,7 +100,8 @@ struct KeystrokeHUDView: View {
                 }
             }
         }
-        .animation(.spring(response: 0.28, dampingFraction: 0.82), value: model.groups)
+        .animation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.26, dampingFraction: 0.84),
+                   value: model.groups)
         .allowsHitTesting(false)
     }
 
@@ -141,6 +143,18 @@ struct KeystrokeStackView: View {
     let scale: CGFloat
     let glass: KeystrokeGlass
     var showWindows = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Pills pop in from their anchor and fade out, so a combination leaving
+    /// never looks like it is shrinking into the next one. With Reduce Motion
+    /// both directions are a plain fade.
+    private var transition: AnyTransition {
+        if reduceMotion { return .opacity }
+        return .asymmetric(
+            insertion: .scale(scale: 0.88, anchor: KeystrokeHUDView.scaleAnchor(position)).combined(with: .opacity),
+            removal: .opacity
+        )
+    }
 
     var body: some View {
         VStack(alignment: KeystrokeHUDView.stackAlignment(position), spacing: 8 * scale) {
@@ -150,7 +164,7 @@ struct KeystrokeStackView: View {
                                    alignment: KeystrokeHUDView.stackAlignment(position))
                     .opacity(isOld ? 0.55 : 1)
                     .scaleEffect(isOld ? 0.86 : 1, anchor: KeystrokeHUDView.scaleAnchor(position))
-                    .transition(.scale(scale: 0.85).combined(with: .opacity))
+                    .transition(transition)
             }
         }
     }
