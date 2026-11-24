@@ -1,10 +1,13 @@
 name: Release
 
-# Push a tag such as v1.0.0 to build TeachLens and publish the DMG on
+# Push a tag such as v1.0.0 (or change VERSION on main) to build TeachLens and publish the DMG on
 # GitHub Releases (the only distribution channel; no Mac App Store build).
 on:
   push:
     tags: ["v*"]
+    # Changing VERSION on main also publishes that version (tag + release).
+    branches: [main]
+    paths: [VERSION]
   workflow_dispatch:
     inputs:
       version:
@@ -29,8 +32,10 @@ jobs:
       - name: Version
         id: version
         run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
+          if [ "${{ github.event_name }}" = "push" ] && [ "${GITHUB_REF_TYPE}" = "tag" ]; then
             VERSION="${GITHUB_REF_NAME#v}"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            VERSION="$(tr -d '[:space:]' < VERSION)"
           else
             VERSION="${{ github.event.inputs.version }}"
           fi

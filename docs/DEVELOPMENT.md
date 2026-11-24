@@ -17,7 +17,7 @@ Building, testing, signing and releasing TeachLens. For installation and usage s
 ## CI and releases
 
 - `.github/workflows/build.yml` runs on every push/PR on macos-15 and macos-26: build, self-test, release build + DMG, then an install smoke test (install to /Applications, launch, single-instance check, logs, crash reports, screenshot).
-- `.github/workflows/release.yml`: push a tag `vX.Y.Z` to build a universal `TeachLens.app` and publish `TeachLens-X.Y.Z.dmg` on GitHub Releases.
+- `.github/workflows/release.yml`: change `VERSION` on main (or push a tag `vX.Y.Z`) to build a universal `TeachLens.app` and publish `TeachLens-X.Y.Z.dmg` on GitHub Releases.
 
 ## Build, Test, Run
 
