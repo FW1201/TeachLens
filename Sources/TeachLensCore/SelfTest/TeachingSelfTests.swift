@@ -42,7 +42,7 @@ enum TeachingSelfTests {
 
     private static func testWhiteboardShapesAndPages() throws {
         // Boards saved before shapes existed still load.
-        let old = Data(#"{"points":[{"x":1,"y":2}],"color":{"r":0,"g":0,"b":0},"width":4,"isHighlighter":false}"#.utf8)
+        let old = Data(#"{"points":[[1,2]],"color":{"r":0,"g":0,"b":0},"width":4,"isHighlighter":false}"#.utf8)
         let stroke = try JSONDecoder().decode(WhiteboardStroke.self, from: old)
         try expect(stroke.kind == .free, "Whiteboard: old strokes should load as free strokes")
 
