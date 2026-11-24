@@ -88,6 +88,9 @@ final class AppController: NSObject {
         captionController.toggle()
     }
 
+    /// Replaced by WhiteboardController.toggle when the menu is built.
+    @objc func toggleWhiteboard() {}
+
     @objc func showSettings() {
         settingsWindowController.show()
     }

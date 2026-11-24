@@ -5,6 +5,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var appController: AppController?
     private var courseModeController: CourseModeController?
+    private var whiteboardController: WhiteboardController?
 
     public override init() {
         super.init()
@@ -78,6 +79,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         modeCoordinator.onToggleSpotlight = { [weak spotlightController] in
             spotlightController?.toggleSpotlight()
         }
+        let whiteboardController = WhiteboardController()
+        self.whiteboardController = whiteboardController
+        modeCoordinator.onToggleWhiteboard = { [weak whiteboardController] in
+            whiteboardController?.toggle()
+        }
+
         let captionController = CaptionController()
         captionController.onHotkeyChange = { [weak hotkeyService] in
             hotkeyService?.reloadHotkey()
@@ -206,6 +213,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         courseModes.menuItem = modesItem
         menu.insertItem(modesItem, at: 1)
 
+        if let index = menu.items.firstIndex(where: { $0.action == #selector(AppController.toggleWhiteboard) }),
+           let whiteboard = whiteboardController {
+            menu.items[index].target = whiteboard
+            menu.items[index].action = #selector(WhiteboardController.toggle)
+        }
         if let index = menu.items.firstIndex(where: { $0.action == #selector(AppController.toggleCaptions) }) {
             let toggleItem = menu.items[index]
             toggleItem.target = controller.captionController
@@ -262,6 +274,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             StatusMenuEntry(title: "Show Keystrokes", action: #selector(AppController.toggleKeystrokes), keyEquivalent: ""),
             StatusMenuEntry(title: "Spotlight", action: #selector(AppController.toggleSpotlight), keyEquivalent: ""),
             StatusMenuEntry(title: "Live Captions", action: #selector(AppController.toggleCaptions), keyEquivalent: ""),
+            StatusMenuEntry(title: "Whiteboard", action: #selector(AppController.toggleWhiteboard), keyEquivalent: ""),
             .separator,
             StatusMenuEntry(title: "Check Permissions", action: #selector(AppController.checkPermissions), keyEquivalent: ""),
             StatusMenuEntry(title: "Quit", action: #selector(AppController.quit), keyEquivalent: "q")

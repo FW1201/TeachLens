@@ -23,3 +23,4 @@ README 中的每張圖都對應這裡的一個檔名。實測後把截圖存成�
 | `16-break-timer.png` | ⌃3 休息計時器 |
 | `17-recording-editor.png` | ⌃5 錄影結束後的剪輯視窗 |
 | `18-settings-about.png` | 設定視窗左下角的版本與出處（Fork 開發：數位敘事力期刊） |
+| `19-whiteboard.png` | ⌃⇧W 白板：方格背景、幾筆標註、頁碼 2 / 3 |

@@ -11,6 +11,10 @@ enum HotkeyConflicts {
         var modifiers: UInt
     }
 
+    /// The whiteboard shortcut is fixed at Control+Shift+W.
+    static let whiteboardKeyCode = kVK_ANSI_W
+    static let whiteboardModifiers: UInt = NSEvent.ModifierFlags.control.rawValue | NSEvent.ModifierFlags.shift.rawValue
+
     static let relevantModifiers: NSEvent.ModifierFlags = [.command, .option, .control, .shift]
 
     static func normalized(_ modifiers: UInt) -> UInt {
@@ -46,6 +50,7 @@ enum HotkeyConflicts {
         list.append(Shortcut(name: "Spotlight", keyCode: spotlight.toggleKeyCode, modifiers: spotlight.toggleModifiers))
         let captions = CaptionSettingsStore().load()
         list.append(Shortcut(name: "Live Captions", keyCode: captions.toggleKeyCode, modifiers: captions.toggleModifiers))
+        list.append(Shortcut(name: "Whiteboard", keyCode: whiteboardKeyCode, modifiers: whiteboardModifiers))
         // A key code of 0 disables a shortcut.
         return list.filter { $0.keyCode != 0 }
     }

@@ -26,6 +26,7 @@ final class HotkeyService {
     private var keystrokeHotKeyRef: EventHotKeyRef?
     private var spotlightHotKeyRef: EventHotKeyRef?
     private var captionsHotKeyRef: EventHotKeyRef?
+    private var whiteboardHotKeyRef: EventHotKeyRef?
     private var zoomInNavRef: EventHotKeyRef?
     private var zoomOutNavRef: EventHotKeyRef?
     private var eventHandlerRef: EventHandlerRef?
@@ -147,6 +148,7 @@ final class HotkeyService {
                 case 19: command = .toggleKeystrokes
                 case 20: command = .toggleSpotlight
                 case 21: command = .toggleCaptions
+                case 22: command = .toggleWhiteboard
                 default: return noErr
                 }
 
@@ -354,6 +356,16 @@ final class HotkeyService {
             )
         }
 
+        // Whiteboard (TeachLens addition): Control+Shift+W.
+        RegisterEventHotKey(
+            UInt32(HotkeyConflicts.whiteboardKeyCode),
+            carbonModifiers(from: NSEvent.ModifierFlags(rawValue: HotkeyConflicts.whiteboardModifiers)),
+            EventHotKeyID(signature: signature, id: 22),
+            target,
+            0,
+            &whiteboardHotKeyRef
+        )
+
         // DemoMirror: the base shortcut mirrors the whole screen; the same
         // shortcut with Shift toggled selects a region to mirror; with Option
         // toggled it mirrors the window under the cursor.
@@ -467,6 +479,10 @@ final class HotkeyService {
             UnregisterEventHotKey(captionsHotKeyRef)
         }
         captionsHotKeyRef = nil
+        if let whiteboardHotKeyRef {
+            UnregisterEventHotKey(whiteboardHotKeyRef)
+        }
+        whiteboardHotKeyRef = nil
     }
 
     private func carbonModifiers(from flags: NSEvent.ModifierFlags) -> UInt32 {

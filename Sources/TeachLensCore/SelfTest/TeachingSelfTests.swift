@@ -12,6 +12,46 @@ enum TeachingSelfTests {
         try testWindowsEquivalents()
         try testCaptionFormats()
         try testCaptionSentenceTracker()
+        try testWhiteboardPagesAndEraser()
+        try testWhiteboardExportAndStore()
+    }
+
+    private static func testWhiteboardPagesAndEraser() throws {
+        var doc = WhiteboardDocument()
+        let stroke = WhiteboardStroke(points: [CGPoint(x: 100, y: 100), CGPoint(x: 200, y: 100)],
+                                      color: WhiteboardColor.palette[1], width: 4, isHighlighter: false)
+        doc.currentPage.strokes.append(stroke)
+        doc.addPage()
+        doc.addPage()
+        try expect(doc.pages.count == 3 && doc.currentIndex == 2, "Adding pages should move to the new page")
+        doc.go(-5)
+        try expect(doc.currentIndex == 0, "Navigation should clamp at the first page")
+        doc.erase(at: CGPoint(x: 150, y: 300), radius: 10)
+        try expect(doc.currentPage.strokes.count == 1, "Erasing far away should keep the stroke")
+        doc.erase(at: CGPoint(x: 150, y: 104), radius: 10)
+        try expect(doc.currentPage.strokes.isEmpty, "Erasing on the stroke should remove it")
+        doc.deleteCurrentPage()
+        try expect(doc.pages.count == 2, "Deleting should remove a page")
+    }
+
+    private static func testWhiteboardExportAndStore() throws {
+        var doc = WhiteboardDocument()
+        doc.currentPage.background = .grid
+        doc.currentPage.strokes.append(WhiteboardStroke(points: [CGPoint(x: 10, y: 10), CGPoint(x: 800, y: 500)],
+                                                        color: WhiteboardColor.palette[2], width: 6, isHighlighter: false))
+        for _ in 0..<49 { doc.addPage(after: .lines) }
+        let pdf = WhiteboardRenderer.pdfData(doc)
+        guard let provider = CGDataProvider(data: pdf as CFData), let parsed = CGPDFDocument(provider) else {
+            throw SelfTestError.failure("Teaching: whiteboard PDF did not parse")
+        }
+        try expect(parsed.numberOfPages == 50, "Expected a 50-page PDF, got \(parsed.numberOfPages)")
+        try expect(WhiteboardRenderer.pngData(doc.pages[0]) != nil, "PNG export should succeed")
+
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("TeachLensSelfTest-\(UUID().uuidString)/whiteboard.json")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let store = WhiteboardStore(url: url)
+        store.save(doc)
+        try expect(store.load() == doc, "Whiteboard should round-trip through its store")
     }
 
     private static func testCaptionFormats() throws {
