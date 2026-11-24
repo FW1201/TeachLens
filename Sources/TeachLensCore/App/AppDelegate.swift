@@ -2,6 +2,7 @@ import AppKit
 
 @MainActor
 public final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var graphicalTools: GraphicalTools?
     private var statusItem: NSStatusItem?
     private var appController: AppController?
     private var courseModeController: CourseModeController?
@@ -105,11 +106,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         modeCoordinator.onToggleCaptions = { [weak captionController] in
             captionController?.toggle()
         }
-        modeCoordinator.additionalCaptureExclusions = { [weak keystrokeController, weak spotlightController, weak captionController] in
+        modeCoordinator.additionalCaptureExclusions = { [weak self, weak keystrokeController, weak spotlightController, weak captionController] in
             [
                 keystrokeController?.windowNumberForCaptureExclusion,
                 spotlightController?.windowNumberForCaptureExclusion,
-                captionController?.windowNumberForCaptureExclusion
+                captionController?.windowNumberForCaptureExclusion,
+                self?.graphicalTools?.windowNumber
             ].compactMap { $0 }
         }
         modeCoordinator.keystrokeFrameProvider = { [weak keystrokeController] in
@@ -150,6 +152,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             run: { [weak modeCoordinator] command in modeCoordinator?.handle(command) }
         )
 
+        if let teaching = appController?.teaching {
+            graphicalTools = GraphicalTools(teaching: teaching)
+            graphicalTools?.setVisible(UserDefaults.standard.bool(forKey: GraphicalTools.preference))
+        }
         statusItem = makeStatusItem(controller: appController!, courseModes: courseModeController)
         languageObserver = NotificationCenter.default.addObserver(
             forName: L10n.didChangeNotification, object: nil, queue: .main
@@ -157,6 +163,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             MainActor.assumeIsolated { self?.applyLanguageChange() }
         }
         modeCoordinator.onRecordingStateChanged = { [weak self, weak captionController] recording in
+            self?.graphicalTools?.recording = recording
             self?.updateRecordingIndicator(recording)
             captionController?.recordingStateChanged(recording)
         }
@@ -263,8 +270,20 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             menu.insertItem(optionsItem, at: index + 1)
         }
 
+        let graphicalItem = NSMenuItem(title: L10n.t("Graphical Mode", "圖形介面模式"),
+                                       action: #selector(toggleGraphicalTools(_:)), keyEquivalent: "")
+        graphicalItem.target = self
+        graphicalItem.state = UserDefaults.standard.bool(forKey: GraphicalTools.preference) ? .on : .off
+        menu.insertItem(graphicalItem, at: 2)
         item.menu = menu
         return item
+    }
+
+    @objc private func toggleGraphicalTools(_ sender: NSMenuItem) {
+        let enabled = sender.state != .on
+        UserDefaults.standard.set(enabled, forKey: GraphicalTools.preference)
+        sender.state = enabled ? .on : .off
+        graphicalTools?.setVisible(enabled)
     }
 
     /// A single status-bar menu entry (or a separator when `action` is nil).
