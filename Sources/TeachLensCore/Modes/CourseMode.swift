@@ -352,10 +352,10 @@ final class CourseModeController: NSObject, NSMenuItemValidation {
         toastTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 1_600_000_000)
             guard !Task.isCancelled, let panel = self?.toastPanel else { return }
-            NSAnimationContext.runAnimationGroup { context in
+            NSAnimationContext.runAnimationGroup({ context in
                 context.duration = 0.3
                 panel.animator().alphaValue = 0
-            }
+            }, completionHandler: nil)
         }
     }
 }

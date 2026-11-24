@@ -1,339 +1,301 @@
-<p align="center"><img src="docs/icon.png" width="160" alt="TeachLens icon"></p>
+<p align="center"><img src="docs/icon.png" width="160" alt="TeachLens 圖示"></p>
 
-# TeachLens
+<h1 align="center">TeachLens</h1>
 
-TeachLens is a free, open-source macOS menu-bar toolkit for online teaching and screen-based lectures: keystroke and mouse-click display (with Windows equivalents), spotlight and cursor highlight, screen zoom and live zoom, on-screen drawing, live captions with transcript export, course-mode presets, a break timer, snips/OCR and screen recording.
+<p align="center">給 Mac 線上教學講師的螢幕講解工具：按鍵顯示 · Windows 對照 · 聚光燈 · 放大鏡 · 畫筆標註 · 即時字幕 · 課程模式 · 錄影</p>
+
+<p align="center"><b>Fork 開發：<a href="https://www.facebook.com/Journal.of.Digital.Narrative">數位敘事力期刊 Journal of Digital Narrative</a></b></p>
+
+<p align="center">
+  <a href="https://github.com/FW1201/keyviz-for-Mac/releases/latest">⬇︎ 下載最新版</a> ·
+  <a href="#安裝">安裝</a> ·
+  <a href="#快速上手">快速上手</a> ·
+  <a href="#功能說明">功能說明</a> ·
+  <a href="#常見問題">常見問題</a> ·
+  <a href="docs/DEVELOPMENT.md">開發者文件</a>
+</p>
+
+> English summary: TeachLens is a free, open-source macOS menu-bar toolkit for online teaching — keystroke display with Windows equivalents, spotlight, zoom, on-screen drawing, live captions with transcript export, course-mode presets and screen recording. Download the DMG from [Releases](https://github.com/FW1201/keyviz-for-Mac/releases). Built on ZoomIt for Mac (MIT) and Keyviz (GPL-3.0); licensed GPL-3.0.
+
+---
+
+## 為什麼用 TeachLens
+
+線上授課、錄製教學影片或示範操作時，學生常看不到你按了什麼、滑鼠在哪、你正在講哪一塊。TeachLens 常駐在選單列，一個快捷鍵就能：
+
+- **讓學生看到你按的快捷鍵**：⌘⇧4、⌥←、⌘ 點擊……即時顯示在畫面上。
+- **同步顯示 Windows 對照**：⌘C 下方顯示 Ctrl + C，用 Windows 的學生也跟得上。
+- **把視線帶到重點**：聚光燈、游標光圈、搖動找游標、放大鏡、畫筆標註。
+- **自動上字幕**：講話即時轉成字幕，課後匯出 .srt 逐字稿。
+- **一鍵切換課程情境**：講解、程式示範、重點強調、休息。
+
+<!-- 截圖：06-keystrokes-hud.png（主視覺） -->
+<p align="center"><img src="docs/screenshots/06-keystrokes-hud.png" width="720" alt="按鍵顯示畫面（待補截圖）"></p>
+
+---
+
+## 系統需求
+
+| 項目 | 需求 |
+|---|---|
+| macOS | 14 Sonoma 以上（macOS 26 以上會顯示 Liquid Glass 樣式） |
+| 晶片 | Apple Silicon 與 Intel 皆可（Universal） |
+| 權限 | 螢幕錄製、輸入監控；使用字幕時另需麥克風、語音辨識 |
+| 費用 | 免費、開源（GPL-3.0），只在 GitHub 發佈，不上架 App Store |
+
+---
+
+## 安裝
+
+### 1. 下載
+
+到 **[Releases 頁面](https://github.com/FW1201/keyviz-for-Mac/releases/latest)** 下載 `TeachLens-版本.dmg`。
+
+### 2. 拖進「應用程式」
+
+打開 DMG，把 **TeachLens** 拖到 **Applications（應用程式）**。
+
+<!-- 截圖：01-dmg-window.png -->
+<p align="center"><img src="docs/screenshots/01-dmg-window.png" width="560" alt="DMG 視窗（待補截圖）"></p>
+
+### 3. 第一次開啟（略過 Gatekeeper）
+
+TeachLens 是開源免費版本，沒有付費向 Apple 公證，第一次開啟會被擋。任選一種方式：
+
+- **方法 A**：在「應用程式」裡對 TeachLens **按右鍵 ▸ 打開 ▸ 打開**。
+- **方法 B**：打開「終端機」，貼上：
+
+  ```bash
+  xattr -dr com.apple.quarantine "/Applications/TeachLens.app"
+  ```
+
+<!-- 截圖：02-gatekeeper-open.png -->
+<p align="center"><img src="docs/screenshots/02-gatekeeper-open.png" width="420" alt="右鍵打開確認（待補截圖）"></p>
+
+> 若出現「已損毀，無法打開」，同樣用方法 B 解決；這是未公證 App 的系統提示，不是檔案真的壞掉。
+
+### 4. 開啟權限
+
+TeachLens 會在需要時請求權限，也可以從選單列 **TeachLens ▸ Check Permissions** 一次檢查：
+
+| 權限 | 用途 | 位置（系統設定 ▸ 隱私權與安全性） |
+|---|---|---|
+| 螢幕錄製 | 放大鏡、截圖、錄影 | 螢幕與系統錄音 |
+| 輸入監控 | 顯示按鍵與滑鼠點擊 | 輸入監控 |
+| 麥克風 | 即時字幕、錄影收音 | 麥克風 |
+| 語音辨識 | 即時字幕 | 語音辨識 |
+| 相機（選用） | 錄影時的子母畫面 | 相機 |
+
+**開啟「螢幕錄製」或「輸入監控」後，請結束並重新打開 TeachLens 才會生效。**
+
+<!-- 截圖：03-permissions-dialog.png、04-input-monitoring.png -->
+<p align="center">
+  <img src="docs/screenshots/03-permissions-dialog.png" width="380" alt="權限對話框（待補截圖）">
+  <img src="docs/screenshots/04-input-monitoring.png" width="380" alt="輸入監控設定（待補截圖）">
+</p>
+
+### 更新與移除
+
+- **更新**：下載新版 DMG，覆蓋「應用程式」裡的 TeachLens 即可，設定會保留。
+- **移除**：把 TeachLens 丟到垃圾桶；如要連設定一起清除，在終端機執行 `defaults delete io.github.fw1201.teachlens`。
+
+---
+
+## 快速上手
+
+TeachLens 沒有 Dock 圖示，執行後在**畫面右上角選單列**出現金色放大鏡圖示，所有功能都在這裡。
+
+<!-- 截圖：05-menu-bar.png -->
+<p align="center"><img src="docs/screenshots/05-menu-bar.png" width="360" alt="選單列選單（待補截圖）"></p>
+
+**五分鐘上課流程：**
+
+1. 上課前：選單列 ▸ **課程模式 ▸ 講解**（開啟按鍵顯示、游標強調、字幕）。
+2. 示範快捷鍵：直接按，學生會看到畫面下方的按鍵膠囊；需要時開啟 **Windows 對照**。
+3. 要強調某一區：按 **⌃⇧0** 開聚光燈，或 **⌃1** 放大後用滑鼠畫重點。
+4. 下課休息：**課程模式 ▸ 休息**（自動開啟倒數計時）。
+5. 課後：**字幕選項 ▸ 匯出逐字稿（.srt）**。
+
+### 快捷鍵總表
+
+| 功能 | 預設快捷鍵 |
+|---|---|
+| 顯示／隱藏按鍵 | ⌃0 |
+| 聚光燈 | ⌃⇧0 |
+| 即時字幕 | ⌃⇧C |
+| 靜態放大（凍結畫面） | ⌃1 |
+| 畫筆標註（不放大） | ⌃2 |
+| 休息計時器 | ⌃3 |
+| 即時放大 | ⌃4 |
+| 錄製全螢幕／區域 | ⌃5／⌃⇧5 |
+| 截圖到剪貼簿／存檔／文字辨識 | ⌃6／⌃⇧6／⌃⌥6 |
+| DemoMirror 鏡像 | ⌃9 |
+| 長截圖到剪貼簿／存檔 | ⌃8／⌃⇧8 |
+
+所有快捷鍵都能在 **Settings（設定）** 修改；設定時若和其他功能衝突，會顯示橘色警告。
+
+---
+
+## 功能說明
+
+### 1. 按鍵顯示（Keystrokes）
+
+把你按的快捷鍵與滑鼠動作顯示在畫面上，學生不用猜你按了什麼。
+
+- 修飾鍵依 Mac 慣例合併成一格（⌃⌥⇧⌘），主鍵用白色圓角塊。
+- 連按同一組會顯示「×3」。
+- 滑鼠：⌘ 點擊、⌥ 拖曳、滾輪都會顯示；點擊位置出現漣漪（左鍵白色、右鍵橘色）。
+- 預設只顯示「快捷鍵」（有修飾鍵的組合），打字內容不會露出；可改成「每個鍵」。
+- 背景三選一：**Liquid Glass**（macOS 26+）、霧面、實色（錄影或背景很花時最清楚）。
+
+<!-- 截圖：06-keystrokes-hud.png、08-keystrokes-settings.png -->
+<p align="center">
+  <img src="docs/screenshots/06-keystrokes-hud.png" width="420" alt="按鍵膠囊（待補截圖）">
+  <img src="docs/screenshots/08-keystrokes-settings.png" width="380" alt="Keystrokes 設定（待補截圖）">
+</p>
+
+**設定位置**：選單列 ▸ Keystroke Options，或 Settings ▸ Keystrokes（位置、大小、停留秒數、歷史筆數、快捷鍵）。
+
+### 2. Windows 對照
+
+開啟後，每組 Mac 快捷鍵下方會出現藍色的 Windows 對應按鍵，方便同時教 Mac 與 Windows 的學生。對照規則依 Apple 官方說明〈[Mac 上的 Windows 鍵盤對應鍵](https://support.apple.com/zh-hk/guide/mac-help/cpmh0038/mac)〉。
+
+| Mac | Windows |
+|---|---|
+| ⌘C／⌘V／⌘Z | Ctrl + C／Ctrl + V／Ctrl + Z |
+| ⇧⌘Z | Ctrl + Y |
+| ⌘Q | Alt + F4 |
+| ⌘Tab | Alt + Tab |
+| ⌥⌘Esc（強制結束） | Ctrl + Alt + Delete |
+| ⇧⌘3／⇧⌘4 | Print Screen／Win + Shift + S |
+| ⌘←／⌘→ | Home／End |
+| ⌥←／⌥→ | Ctrl + ←／Ctrl + → |
+| ⌃ 點擊 | 右鍵 |
+| Delete／fn + Delete | Backspace／Delete |
+
+**開啟方式**：選單列 ▸ Keystroke Options ▸ **Windows 對照**，或 Settings ▸ Keystrokes ▸ 開啟 Windows 對照。
+
+<!-- 截圖：07-windows-equivalent.png -->
+<p align="center"><img src="docs/screenshots/07-windows-equivalent.png" width="520" alt="Windows 對照（待補截圖）"></p>
+
+### 3. 聚光燈與游標強調（Spotlight）
+
+- **聚光燈（⌃⇧0）**：畫面變暗，只亮滑鼠周圍；形狀可選圓形或「寬條」（適合逐行讀文字）。
+- **游標光圈**：滑鼠外圍一圈彩色光環（黃、青、粉、綠）。
+- **搖動找游標**：左右快速搖動滑鼠，游標位置會出現放大光圈。
+
+調整：選單列 ▸ Spotlight Options，或 Settings ▸ Spotlight（大小、暗度、顏色、快捷鍵）。
+
+<!-- 截圖：09-spotlight.png、10-cursor-highlight.png -->
+<p align="center">
+  <img src="docs/screenshots/09-spotlight.png" width="400" alt="聚光燈（待補截圖）">
+  <img src="docs/screenshots/10-cursor-highlight.png" width="400" alt="游標強調（待補截圖）">
+</p>
+
+### 4. 放大鏡與畫筆標註（Zoom & Draw）
+
+| 操作 | 說明 |
+|---|---|
+| ⌃1 | 凍結畫面並放大；滾輪或 ⌥↑／⌥↓ 調整倍率 |
+| ⌃4 | 即時放大（畫面持續更新） |
+| ⌃2 | 不放大，直接在畫面上畫 |
+| 左鍵拖曳 | 畫筆；按住 Shift 畫直線、Control 畫矩形、Control+Shift 畫箭頭、Tab 畫橢圓 |
+| R／G／B／O／Y／P／W／K | 紅、綠、藍、橘、黃、粉、白、黑；加 Shift 變螢光筆 |
+| T | 打字標註（⇧T 靠右）；↑／↓ 或滾輪調整字級 |
+| ⌃W／⌃K | 白板／黑板 |
+| ⌘Z／E | 復原／清除 |
+| ⌘C／⌘S | 複製／儲存目前畫面 |
+| Esc 或右鍵 | 離開 |
+
+<!-- 截圖：11-static-zoom.png、12-live-zoom.png -->
+<p align="center">
+  <img src="docs/screenshots/11-static-zoom.png" width="400" alt="靜態放大與標註（待補截圖）">
+  <img src="docs/screenshots/12-live-zoom.png" width="400" alt="即時放大（待補截圖）">
+</p>
+
+### 5. 即時字幕與逐字稿（Live Captions）
+
+- 按 **⌃⇧C** 開始，畫面下方即時顯示你說的話（兩行）；停頓後自動斷句。
+- 語言：中文（台灣）、中文（简体）、English、日本語、한국어；支援的語言會在 Mac 本機辨識，不上傳雲端。
+- **匯出**：字幕選項 ▸ 匯出逐字稿（.srt／.vtt／.txt）。
+- **錄影字幕**：錄影時開著字幕，錄完選 **匯出上一段錄影的字幕（.srt）**，時間軸會對齊影片開頭，可直接匯入剪輯軟體或 YouTube。
+
+<!-- 截圖：13-captions.png、14-caption-export.png -->
+<p align="center">
+  <img src="docs/screenshots/13-captions.png" width="420" alt="即時字幕（待補截圖）">
+  <img src="docs/screenshots/14-caption-export.png" width="360" alt="匯出逐字稿（待補截圖）">
+</p>
+
+### 6. 課程模式（Course Modes）
+
+一鍵切換整組設定，切換時右上角會短暫顯示目前模式：
+
+| 模式 | 按鍵顯示 | 聚光燈 | 游標光圈 | 字幕 | 其他 |
+|---|---|---|---|---|---|
+| 講解 | 快捷鍵 | — | ✓ | ✓ | |
+| 程式示範 | 每個鍵＋歷史、放大 1.25 倍 | — | ✓ | — | |
+| 重點強調 | — | ✓ | — | — | |
+| 休息 | — | — | — | — | 開啟休息計時器 |
+
+- **自訂模式**：調好設定後選 **將目前設定存成模式…**。
+- **分享模式**：**匯出模式…** 產生 JSON 檔，其他老師用 **匯入模式…** 載入。
+- 重開 TeachLens 會回到上次的模式（不會自動開麥克風或計時器）。
+
+<!-- 截圖：15-course-modes.png -->
+<p align="center"><img src="docs/screenshots/15-course-modes.png" width="520" alt="課程模式（待補截圖）"></p>
+
+### 7. 休息計時器、截圖、錄影
+
+- **⌃3 休息計時器**：全螢幕倒數，可設定時間、顏色、背景圖與提示音（Settings ▸ Break）。
+- **⌃6 截圖**：拖曳範圍複製到剪貼簿；⌃⇧6 存檔；⌃⌥6 辨識文字（OCR）。
+- **⌃8 長截圖**：選取範圍後捲動，自動拼接成一張長圖。
+- **⌃5 錄影**：全螢幕或區域（⌃⇧5），可收系統聲音、麥克風、加相機子母畫面；結束後可剪輯、淡入淡出再存檔。按鍵顯示與畫筆標註都會錄進影片。
+
+<!-- 截圖：16-break-timer.png、17-recording-editor.png -->
+<p align="center">
+  <img src="docs/screenshots/16-break-timer.png" width="400" alt="休息計時器（待補截圖）">
+  <img src="docs/screenshots/17-recording-editor.png" width="400" alt="錄影剪輯（待補截圖）">
+</p>
+
+### 搭配視訊會議
+
+在 Google Meet、Zoom、Teams 選擇**分享整個螢幕**（不是只分享單一視窗），學生才看得到按鍵顯示、聚光燈與字幕。
+
+---
+
+## 常見問題
+
+**按鍵沒有顯示？**
+確認「輸入監控」已開啟 TeachLens，並**重新開啟 App**。選單列 ▸ Check Permissions 可檢查狀態。預設只顯示快捷鍵，單純打字不會出現；要顯示全部，到 Keystroke Options 取消「Shortcuts Only」。
+
+**按 ⌃1 一直跳出螢幕錄製設定？**
+在系統設定開啟「螢幕錄製」後要重開 TeachLens。若仍失敗，在終端機執行 `tccutil reset ScreenCapture io.github.fw1201.teachlens` 後重新授權。
+
+**字幕沒有反應？**
+確認「麥克風」「語音辨識」都已允許；選單列 ▸ 字幕選項確認語言正確。
+
+**快捷鍵和其他 App 衝突？**
+到 Settings 對應分頁點快捷鍵按鈕重新錄製；按 Esc 取消。
+
+**為什麼不上 App Store？**
+App Store 版必須放進沙盒，會失去 DemoType 等功能，審核也較慢。TeachLens 選擇以開源方式在 GitHub 發佈，原始碼公開可檢查。
+
+---
+
+## 出處與授權
 
 **Fork 開發：[數位敘事力期刊 Journal of Digital Narrative](https://www.facebook.com/Journal.of.Digital.Narrative)**
 
-## Download and install
+TeachLens 由兩個開源專案改作而成：
 
-TeachLens is distributed only as an open-source download from **[GitHub Releases](https://github.com/FW1201/keyviz-for-Mac/releases)** — there is no Mac App Store version.
-
-1. Download `TeachLens-<version>.dmg` from the latest release and open it.
-2. Drag **TeachLens** into **Applications**.
-3. The build is not notarized by Apple, so macOS blocks the first launch. Either right-click the app ▸ **Open** ▸ **Open**, or run once in Terminal:
-
-   ```sh
-   xattr -dr com.apple.quarantine "/Applications/TeachLens.app"
-   ```
-
-4. Grant the permissions TeachLens asks for (System Settings ▸ Privacy & Security): **Screen Recording** (zoom, snip, record), **Input Monitoring** (keystroke display), **Microphone** and **Speech Recognition** (live captions). Quit and reopen TeachLens after granting Input Monitoring or Screen Recording.
-
-Requires macOS 14 or later. Liquid Glass styling appears on macOS 26 and later.
-
-## Credits and open-source origins
-
-TeachLens is a derivative work of two open-source projects:
-
-| Project | Author | License | Used for |
+| 專案 | 作者 | 授權 | 用途 |
 |---|---|---|---|
-| [ZoomIt for Mac](https://github.com/microsoft/Zoomit-Mac) | Microsoft Corporation | MIT | Application base: zoom, drawing, timer, capture, recording (imported at upstream commit `45e15ac`) |
-| [Keyviz](https://github.com/mulaRahul/keyviz) | Rahul Mula | GPL-3.0 | Keystroke and mouse visualization (being ported to Swift; original Tauri source kept in [`Legacy/keyviz/`](Legacy/keyviz/)) |
+| [ZoomIt for Mac](https://github.com/microsoft/Zoomit-Mac) | Microsoft Corporation | MIT | App 主體：放大、畫筆、計時器、截圖、錄影（上游 commit `45e15ac`） |
+| [Keyviz](https://github.com/mulaRahul/keyviz) | Rahul Mula | GPL-3.0 | 按鍵與滑鼠顯示（以 Swift 重寫；原始碼保留於 [`Legacy/keyviz/`](Legacy/keyviz/)） |
 
-TeachLens as a whole is distributed under the **GNU GPL-3.0** ([LICENSE](LICENSE)). The MIT notice for ZoomIt for Mac is kept in [ThirdParty/ZoomIt-Mac-LICENSE.txt](ThirdParty/ZoomIt-Mac-LICENSE.txt); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). TeachLens is maintained as a fork by [數位敘事力期刊 Journal of Digital Narrative](https://www.facebook.com/Journal.of.Digital.Narrative) and is not affiliated with or endorsed by Microsoft, Sysinternals, or the Keyviz project. The App Store build option inherited from ZoomIt for Mac is kept in the source but not used for distribution. The settings footer in the app shows the same credits.
+TeachLens 整體以 **GNU GPL-3.0** 授權（[LICENSE](LICENSE)），ZoomIt for Mac 的 MIT 授權全文見 [ThirdParty/ZoomIt-Mac-LICENSE.txt](ThirdParty/ZoomIt-Mac-LICENSE.txt)，完整說明見 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。TeachLens 與 Microsoft、Sysinternals、Keyviz 專案無隸屬或背書關係。
 
-## Default hotkeys
+<!-- 截圖：18-settings-about.png -->
+<p align="center"><img src="docs/screenshots/18-settings-about.png" width="420" alt="設定視窗出處（待補截圖）"></p>
 
-| Action | Hotkey |
-|---|---|
-| Static zoom | Control+1 |
-| Draw without zoom | Control+2 |
-| Break timer | Control+3 |
-| Live zoom | Control+4 |
-| Record screen / region | Control+5 / Control+Shift+5 |
-| Snip to clipboard / file / OCR | Control+6 / Control+Shift+6 / Control+Option+6 |
-| Panorama to clipboard / file | Control+8 / Control+Shift+8 |
-| Show / hide keystrokes | Control+0 |
-| Spotlight | Control+Shift+0 |
-| Live captions | Control+Shift+C |
-
-All hotkeys are configurable in Settings.
-
-## Features
-
-- Static zoom over a frozen ScreenCaptureKit display capture.
-- Live zoom of the running screen, with click-through interaction when not drawing.
-- Time-based, eased zoom animations for static and live zoom, with continuous
-  motion when retargeting and no slowdown from delayed animation frames.
-- Draw-without-zoom mode for annotating the screen at 1x.
-- Pen, line, rectangle, ellipse, arrow, highlighter, undo, erase, blank-screen sketch pads, and typing annotations.
-- Viewport screenshot copy/save and region snip copy/save.
-- Optional snip dictation that records speech during a clipboard snip and copies the image and transcript together.
-- OCR snip: select a screen region and copy its recognized text to the clipboard.
-- Break timer with a configurable countdown, colors, opacity, background, and optional sound.
-- MP4 screen recording for the whole screen or a selected region, with optional system audio, microphone audio, and fixed webcam picture-in-picture.
-- Post-recording video editor with preview, trim, append, fades, playback controls, volume mute/slider, and export before save.
-- Scrolling panorama capture with alignment, fixed header/footer suppression, progress, cancellation, and copy/save output.
-- Tabbed Settings dialog for hotkeys, zoom, draw, type, snip, record, webcam, panorama, and launch-at-login preferences.
-- Single-instance app behavior, menu-bar status, permission checks, and optional launch at login.
-
-## Requirements
-
-- macOS 14 or newer.
-- Xcode command-line tools.
-- Screen Recording permission for capture.
-- Microphone and Speech Recognition permissions for live captions.
-- Input Monitoring permission to show keystrokes (System Settings ▸ Privacy & Security ▸ Input Monitoring).
-- Microphone and Speech Recognition permissions are required only for microphone recording and optional snip dictation; Camera is required only for the webcam option.
-
-## Build, Test, Run
-
-```sh
-swift build
-swift run TeachLensSelfTest
-swift run TeachLens
-```
-
-The self-test covers viewport math, annotation lifecycle/rendering, settings persistence, and panorama stitcher regressions.
-
-Run the sandbox product-surface tests with the App Store compiler condition:
-
-```sh
-swift run -Xswiftc -DTEACHLENS_APP_STORE TeachLensSelfTest
-```
-
-Launch at login requires running TeachLens as an app bundle so macOS attributes the login item to TeachLens instead of the host process used for development. Build the bundle with:
-
-```sh
-zsh Scripts/build-app.sh
-open ".build/TeachLens (Dev).app"
-```
-
-The contributor build is named `TeachLens (Dev).app` (bundle id `io.github.fw1201.teachlens.dev`) so it stays distinct from an installed official `TeachLens.app` in the Screen Recording list. See [Bundle identity](#bundle-identity-dev-vs-official) below.
-
-## Default Hotkeys
-
-| Action | Shortcut |
-| --- | --- |
-| Static zoom | `Control+1` |
-| Draw without zoom | `Control+2` |
-| Break timer | `Control+3` |
-| Live zoom | `Control+4` |
-| Record screen | `Control+5` |
-| Record region | `Control+Shift+5` |
-| Snip region to clipboard | `Control+6` |
-| Snip region to file | `Control+Shift+6` |
-| OCR region to clipboard | `Control+Option+6` |
-| Panorama to clipboard | `Control+8` |
-| Panorama to file | `Control+Shift+8` |
-
-All global hotkeys are configurable in Settings. While zoomed, use `Option+Up` and `Option+Down` to change zoom level, mouse wheel to zoom or resize tools depending on mode, `Command+S` / `Command+C` to save or copy the viewport, and `Esc` or right click to exit the active overlay mode.
-
-## Drawing And Typing
-
-- Left click enters drawing mode; drag to draw.
-- Hold `Shift` for a line, `Control` for a rectangle, `Control+Shift` for an arrow, or `Tab` for an ellipse.
-- Press `R/G/B/O/Y/P/W/K` for red, green, blue, orange, yellow, pink, white, or black; hold `Shift` with a color for highlighter ink.
-- Press `T` for typing mode, `Shift+T` for right-aligned typing, and `Up` / `Down` or the mouse wheel to adjust font size.
-- Use `Command+Z` to undo and `E` to erase annotations.
-
-## Snip And OCR
-
-Press the snip shortcut (`Control+6`) and drag a rectangle to copy that region of the screen to the clipboard; hold `Shift` (`Control+Shift+6`) to save it to a PNG file instead. Snip also works while zoomed, capturing the magnified view.
-
-Snip dictation is off by default and can be enabled on the Snip tab in Settings. During a clipboard snip, press `Space` once while actively dragging to start listening. Releasing the mouse keeps the selection and status badge visible while transcription finishes; press `Esc` to cancel without replacing the clipboard. Extra or auto-repeated Space presses do not restart dictation.
-
-On success, TeachLens writes one multi-representation clipboard item. Its RTFD and HTML forms contain both the image and transcript, with PNG, TIFF, and plain-text fallbacks so each destination app can choose the format it supports. An empty transcript produces the same PNG/TIFF image-only payload as a normal snip. TeachLens does not intercept paste or synthesize paste events, so this feature does not require Accessibility or Input Monitoring permission.
-
-Dictation uses Apple's Speech and AVFoundation frameworks, prefers on-device recognition when the selected language supports it, and otherwise uses Apple's normal recognizer. It shares the configured recording microphone selection (falling back to the system default if the saved device is missing), but enabling microphone audio in recordings and enabling snip dictation are independent.
-
-Press the OCR shortcut (`Control+Option+6`) and drag a rectangle to recognize the text inside it and copy that text to the clipboard. OCR uses Apple's on-device Vision text recognition, runs entirely on-device, and needs no extra permissions. Both shortcuts are configurable on the Snip tab in Settings.
-
-## Recording
-
-Recording uses ScreenCaptureKit and AVAssetWriter. Static zoom and drawing overlays are captured even when ScreenCaptureKit omits TeachLens's own windows; live zoom remains excluded from its own capture to avoid feedback. Webcam picture-in-picture stays fixed in the recorded viewport and is composited into overlay recordings instead of being zoomed into the source image.
-
-When recording stops, TeachLens opens the built-in editor before the save panel so the clip can be trimmed, appended to another clip, faded, muted, and exported.
-
-## Panorama
-
-Panorama capture records a selected scroll region while you scroll, then stitches the frames into one image. It filters repeated frames, handles vertical or horizontal scrolls, suppresses fixed headers and footers, shows stitch progress, and can be canceled with `Esc`.
-
-## Settings And Permissions
-
-Settings are saved immediately to `UserDefaults`. The app includes permission checks for Screen Recording, Microphone, Speech Recognition, and Camera. Snip dictation requests only Microphone and Speech Recognition; it does not use Accessibility or Input Monitoring. Running from SwiftPM is supported for development; launch at login and production distribution are intended for the bundled app form.
-
-## Distributing To Testers
-
-Testers should run the bundled app, not `swift run`. Build a release app bundle:
-
-```sh
-zsh Scripts/build-app.sh release
-```
-
-Local bundles default to version `1.0`. Set `TEACHLENS_VERSION` to stamp a
-specific dotted-numeric version into both `CFBundleShortVersionString` and
-`CFBundleVersion`:
-
-```sh
-TEACHLENS_VERSION=1.2.0 zsh Scripts/build-app.sh release
-defaults read "$PWD/.build/TeachLens (Dev).app/Contents/Info" CFBundleShortVersionString
-defaults read "$PWD/.build/TeachLens (Dev).app/Contents/Info" CFBundleVersion
-```
-
-The official Azure DevOps build supplies `TEACHLENS_VERSION` from the version
-entered when the pipeline is queued. Values must contain two or three numeric
-components, such as `1.2` or `1.2.0`; malformed values fail before compilation
-or signing begins.
-
-## Build Variants
-
-One source tree produces the standard unsandboxed application and the sandboxed
-product surface used for Mac App Store releases.
-
-| Variant | Product surface |
-| --- | --- |
-| Homebrew | Unsandboxed, including DemoType |
-| Mac App Store | App Sandbox; DemoType is compiled out |
-
-`TEACHLENS_DISTRIBUTION` selects the channel and defaults to `homebrew`, preserving
-the existing local build command. `TEACHLENS_BUILD_NUMBER` independently stamps a
-numeric `CFBundleVersion` when a specific local value is needed.
-
-```sh
-# Existing contributor/Homebrew behavior
-zsh Scripts/build-app.sh release
-
-# Explicit Homebrew variant
-TEACHLENS_DISTRIBUTION=homebrew TEACHLENS_BUILD_NUMBER=101 \
-  zsh Scripts/build-app.sh release
-
-# Sandboxed local prototype (still uses the separate contributor identity)
-TEACHLENS_DISTRIBUTION=appstore TEACHLENS_BUILD_NUMBER=101 \
-  zsh Scripts/build-app.sh release
-```
-
-The App Store variant uses security-scoped bookmarks for the selected break
-sound, break background, and automatic snip folder. Re-select a resource in
-Settings if macOS reports that its authorization can no longer be restored.
-Screen recording remains controlled by macOS privacy consent and has no app
-entitlement. 
-
-By default this produces `.build/TeachLens (Dev).app` with the app icon, bundled resources, and an `Info.plist` declaring the microphone, Speech Recognition, and camera usage descriptions. `release` builds are **Universal** (Apple Silicon + Intel) by default; `debug` builds are native to the build machine for speed. Override the architectures with `TEACHLENS_ARCHS` (e.g. `TEACHLENS_ARCHS=arm64`). A Universal build routes through Xcode's build system, so it requires a **full Xcode** install — with only the Command Line Tools the script warns and falls back to a native build. The build summary prints the resulting architectures.
-
-### Create and install a local development DMG
-
-Build the Universal development app, stage it with an Applications shortcut, and create a compressed disk image using macOS's built-in `hdiutil`:
-
-```sh
-zsh Scripts/build-app.sh release
-
-STAGE="$(mktemp -d)"
-ditto ".build/TeachLens (Dev).app" "$STAGE/TeachLens (Dev).app"
-ln -s /Applications "$STAGE/Applications"
-hdiutil create \
-  -volname "TeachLens Dev" \
-  -srcfolder "$STAGE" \
-  -ov -format UDZO \
-  ".build/TeachLens-Dev.dmg"
-rm -rf "$STAGE"
-
-hdiutil verify ".build/TeachLens-Dev.dmg"
-open ".build/TeachLens-Dev.dmg"
-```
-
-Drag **TeachLens (Dev)** to the Applications shortcut in the mounted image, then launch the installed copy:
-
-```sh
-open "/Applications/TeachLens (Dev).app"
-```
-
-A `.dmg` is a disk image, not an executable; use `open path/to/file.dmg` rather than invoking the path directly. Do **not** override a local ad-hoc build to use `io.github.fw1201.teachlens` or the `TeachLens.app` name. That identity is reserved for the officially Developer ID-signed release; an ad-hoc app using it conflicts with the official app's macOS privacy (TCC) grants even when System Settings shows Screen Recording as enabled.
-
-### Bundle identity: dev vs. official
-
-`Scripts/build-app.sh` picks the bundle identity from the signing identity so a locally built copy never fights the officially distributed app over macOS privacy (TCC) grants, which are keyed by bundle id **and** code-signing requirement:
-
-- **Contributor / ad-hoc build (default):** app bundle `TeachLens (Dev).app`, bundle id `io.github.fw1201.teachlens.dev`, display name “TeachLens (Dev)”, ad-hoc signed. Both the distinct file name and bundle id keep it separate from an installed official `TeachLens.app`, so its Screen Recording grant is its own row in System Settings and the two never clobber each other.
-- **Official build:** pass a real Developer ID identity and it keeps the canonical `io.github.fw1201.teachlens` id:
-
-  ```sh
-  TEACHLENS_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
-    zsh Scripts/build-app.sh release
-  ```
-
-Override any field explicitly with `TEACHLENS_SIGN_IDENTITY`, `TEACHLENS_BUNDLE_ID`, and `TEACHLENS_DISPLAY_NAME`. Because a real signing identity has a stable, team-based designated requirement, the official app keeps its Screen Recording permission across updates; an ad-hoc build cannot share that grant since contributors don't have the certificate.
-
-### Entitlements (camera, microphone, and Speech Recognition)
-
-`build-app.sh` signs with camera and audio-input entitlements. The restricted `com.apple.developer.speech-recognition` entitlement needs a provisioning profile, so it is removed from ad-hoc builds (otherwise macOS refuses to launch the app); outside the sandbox, speech recognition only needs the Info.plist usage description. Screen Recording is pure TCC and needs no entitlement. Verify on the first signed build with `codesign -d --entitlements :- TeachLens.app`.
-
-### Signing options
-
-- **Distributing widely (recommended):** sign with a Developer ID Application certificate, notarize with Apple, and staple the ticket, then zip or wrap the app in a `.dmg`:
-
-  ```sh
-  TEACHLENS_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
-    zsh Scripts/build-app.sh release
-  ditto -c -k --keepParent .build/TeachLens.app TeachLens.zip
-  xcrun notarytool submit TeachLens.zip --apple-id you@example.com \
-    --team-id TEAMID --password APP_SPECIFIC_PASSWORD --wait
-  xcrun stapler staple .build/TeachLens.app
-  ```
-
-  A notarized app opens with a normal double-click and keeps its Screen Recording permission across updates.
-
-- **Quick internal testing (unsigned/ad-hoc):** use the development identity and `TeachLens-Dev.dmg` procedure above. If another Mac downloads the unnotarized DMG, Gatekeeper may block it. After copying the app to `/Applications`, testers can clear the quarantine flag:
-
-  ```sh
-  xattr -dr com.apple.quarantine "/Applications/TeachLens (Dev).app"
-  open "/Applications/TeachLens (Dev).app"
-  ```
-
-  Note that rebuilding an ad-hoc/unsigned app can reset its Screen Recording permission, so testers may need to re-grant it after an update.
-
-### First run
-
-1. Move `TeachLens (Dev).app` (local testing) or `TeachLens.app` (official release) to `/Applications` and open it. It runs as a menu-bar item (no Dock icon).
-2. macOS prompts for **Screen Recording** the first time a capture feature is used; enable the matching **TeachLens (Dev)** or **TeachLens** row in System Settings ▸ Privacy & Security ▸ Screen Recording, then relaunch that same app.
-3. **Microphone** and **Speech Recognition** are requested when snip dictation is enabled; **Microphone** and **Camera** are otherwise requested only when their recording options are enabled.
-4. Use the menu-bar icon or the default hotkeys above to drive the app, and the Settings dialog to customize shortcuts and behavior.
-
-### Clear stale Screen Recording permissions
-
-macOS privacy permissions (TCC) are tied to both an app's bundle identifier and its code-signing requirement. If an ad-hoc build previously used the official `io.github.fw1201.teachlens` identifier, System Settings can show **TeachLens** as enabled while macOS rejects the currently installed Developer ID-signed app. Typical symptoms are:
-
-- `Control+1` repeatedly opens Screen Recording settings even though TeachLens is enabled.
-- Closing the permission dialog and pressing `Control+1` again does nothing.
-- A newly installed, correctly signed build still cannot capture the screen.
-
-Reset only the Screen Recording record for the identity you are running. This removes the stale grant; it does not uninstall the app or clear TeachLens settings.
-
-For the **officially signed** `/Applications/TeachLens.app`:
-
-```sh
-pkill -f "/Applications/TeachLens.app/Contents/MacOS/TeachLens" 2>/dev/null || true
-tccutil reset ScreenCapture io.github.fw1201.teachlens
-
-LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
-"$LSREGISTER" -f "/Applications/TeachLens.app"
-open "/Applications/TeachLens.app"
-```
-
-For the local **development** `/Applications/TeachLens (Dev).app`:
-
-```sh
-pkill -f "/Applications/TeachLens (Dev).app/Contents/MacOS/TeachLens" 2>/dev/null || true
-tccutil reset ScreenCapture io.github.fw1201.teachlens.dev
-
-LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
-"$LSREGISTER" -f "/Applications/TeachLens (Dev).app"
-open "/Applications/TeachLens (Dev).app"
-```
-
-After relaunching:
-
-1. Press `Control+1` once to request Screen Recording access.
-2. Enable the matching **TeachLens** or **TeachLens (Dev)** row in System Settings.
-3. Use macOS's **Quit & Reopen** button, or quit and reopen that same app manually.
-4. Press `Control+1` again.
-
-Static zoom requires **Screen Recording** only. Microphone and Camera permissions are unrelated unless their optional recording features are enabled. If the problem immediately returns after the reset, verify that the installed app has the expected identity:
-
-```sh
-codesign -dv --verbose=2 "/Applications/TeachLens.app" 2>&1 \
-  | grep -E "Identifier=|Authority=Developer ID Application|TeamIdentifier="
-```
-
-The official app should report identifier `io.github.fw1201.teachlens` and a Developer ID authority. Never distribute or install an ad-hoc-signed app under that official identifier; local builds must remain `TeachLens (Dev).app` with identifier `io.github.fw1201.teachlens.dev`.
+開發、建置與發佈流程請見 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)；截圖待補清單見 [docs/screenshots/README.md](docs/screenshots/README.md)。
