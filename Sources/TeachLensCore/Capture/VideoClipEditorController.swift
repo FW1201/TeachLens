@@ -45,12 +45,39 @@ final class VideoClipEditorController: NSObject, NSWindowDelegate, VideoTimeline
         let seekPosition: Double
     }
 
+    /// Track info loaded once per source file with the async AVFoundation APIs,
+    /// so building the composition never touches the deprecated sync getters.
+    private struct ClipMedia {
+        var video: AVAssetTrack?
+        var displaySize: CGSize
+        var audio: [AVAssetTrack]
+        var fullDuration: CMTime
+
+        static func load(_ asset: AVURLAsset) async -> ClipMedia {
+            let duration = (try? await asset.load(.duration)) ?? .zero
+            let video = try? await asset.loadTracks(withMediaType: .video).first
+            let audio = (try? await asset.loadTracks(withMediaType: .audio)) ?? []
+            var size = CGSize(width: 1280, height: 720)
+            if let video, let (natural, transform) = try? await video.load(.naturalSize, .preferredTransform) {
+                // Account for the preferred transform so rotated clips report their displayed size.
+                let s = natural.applying(transform)
+                size = CGSize(width: abs(s.width), height: abs(s.height))
+            }
+            return ClipMedia(video: video, displaySize: size, audio: audio, fullDuration: duration)
+        }
+    }
+
     private struct ClipSegment {
         var asset: AVURLAsset
+        var media: ClipMedia
         var range: CMTimeRange
 
         var duration: CMTime { range.duration }
         var durationSeconds: Double { max(range.duration.seconds, 0) }
+
+        func with(range: CMTimeRange) -> ClipSegment {
+            ClipSegment(asset: asset, media: media, range: range)
+        }
     }
 
     private var window: NSWindow?
@@ -98,11 +125,19 @@ final class VideoClipEditorController: NSObject, NSWindowDelegate, VideoTimeline
         self.preferredWindowLevel = windowLevel
         self.originalURL = tempURL
         let asset = AVURLAsset(url: tempURL)
-        segments = [ClipSegment(asset: asset, range: CMTimeRange(start: .zero, duration: asset.duration))]
+        Task { @MainActor in
+            let media = await ClipMedia.load(asset)
+            self.show(first: ClipSegment(asset: asset, media: media,
+                                         range: CMTimeRange(start: .zero, duration: media.fullDuration)))
+        }
+    }
+
+    private func show(first segment: ClipSegment) {
+        segments = [segment]
         joinTransitions = []
         joinKinds = []
         selectedTransition = .fadeBlack
-        duration = max(asset.duration.seconds, 0.1)
+        duration = max(segment.durationSeconds, 0.1)
         trimStart = 0
         trimEnd = duration
         pendingDeleteStart = nil
@@ -442,7 +477,15 @@ final class VideoClipEditorController: NSObject, NSWindowDelegate, VideoTimeline
         panel.title = L10n.t("Select Video to Append", "選擇要接上的影片")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let asset = AVURLAsset(url: url)
-        segments.append(ClipSegment(asset: asset, range: CMTimeRange(start: .zero, duration: asset.duration)))
+        Task { @MainActor in
+            let media = await ClipMedia.load(asset)
+            self.append(ClipSegment(asset: asset, media: media,
+                                    range: CMTimeRange(start: .zero, duration: media.fullDuration)))
+        }
+    }
+
+    private func append(_ segment: ClipSegment) {
+        segments.append(segment)
         joinTransitions.append(selectedTransition)
         joinKinds.append(.append)
         trimEnd = .greatestFiniteMagnitude // rebuild clamps to the new full duration
@@ -486,7 +529,7 @@ final class VideoClipEditorController: NSObject, NSWindowDelegate, VideoTimeline
             if leftEnd > segmentStart {
                 let keptDuration = leftEnd - segmentStart
                 pieces.append(Piece(
-                    segment: ClipSegment(asset: segment.asset, range: CMTimeRange(start: segment.range.start, duration: cmTime(keptDuration))),
+                    segment: segment.with(range: CMTimeRange(start: segment.range.start, duration: cmTime(keptDuration))),
                     index: index,
                     oldStart: segmentStart,
                     oldEnd: leftEnd,
@@ -499,8 +542,7 @@ final class VideoClipEditorController: NSObject, NSWindowDelegate, VideoTimeline
                 let sourceOffset = rightStart - segmentStart
                 let keptDuration = segmentEnd - rightStart
                 pieces.append(Piece(
-                    segment: ClipSegment(
-                        asset: segment.asset,
+                    segment: segment.with(
                         range: CMTimeRange(start: CMTimeAdd(segment.range.start, cmTime(sourceOffset)), duration: cmTime(keptDuration))
                     ),
                     index: index,
@@ -660,18 +702,15 @@ final class VideoClipEditorController: NSObject, NSWindowDelegate, VideoTimeline
         var segments: [(start: CMTime, size: CGSize)] = []
         var renderSize = CGSize(width: 1280, height: 720)
         for (index, segment) in self.segments.enumerated() {
-            if let v = segment.asset.tracks(withMediaType: .video).first {
+            if let v = segment.media.video {
                 try? vTrack.insertTimeRange(segment.range, of: v, at: cursor)
-                // Account for the track's preferred transform so rotated clips
-                // report their displayed size.
-                let s = v.naturalSize.applying(v.preferredTransform)
-                let size = CGSize(width: abs(s.width), height: abs(s.height))
+                let size = segment.media.displaySize
                 segments.append((cursor, size))
                 if index == 0 { renderSize = size }
                 renderSize.width = max(renderSize.width, size.width)
                 renderSize.height = max(renderSize.height, size.height)
             }
-            for a in segment.asset.tracks(withMediaType: .audio) {
+            for a in segment.media.audio {
                 if let track = comp.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
                     try? track.insertTimeRange(segment.range, of: a, at: cursor)
                     audioSegments.append(AudioSegment(track: track, start: cursor, end: CMTimeAdd(cursor, segment.duration)))
