@@ -27,7 +27,7 @@ architecture changes. Only fixes, wording, spacing, icons and small behavior twe
 
 1. Fix whatever the hands-on QA finds; update the report.
 2. ~~`Capture/VideoClipEditorController.swift`: async `load…` APIs~~ — done.
-3. Before merging PR #11, CI must pass on **both** macOS 15 and 26. Then bump `VERSION` if needed and merge. The release workflow publishes the pre-release.
+3. CI runs on macOS 26 only (macOS 15 runners stopped being assigned; owner dropped it on 2026-11-24). Merge once it is green; the release workflow publishes the pre-release.
 
 ## Owner preferences
 

@@ -17,7 +17,7 @@ A native macOS menu-bar app (Swift 6, SwiftUI + AppKit, macOS 14+) for online te
 
 - macOS only: `swift build` and `swift run TeachLensSelfTest` (all self-tests).
 - Package a dev app: `TEACHLENS_VERSION="$(cat VERSION)" zsh Scripts/build-app.sh release`, which builds `.build/TeachLens (Dev).app`.
-- CI (`.github/workflows/build.yml`) runs on macOS 15 and 26. Each run produces a DMG artifact named `TeachLens-Dev-dmg-<os>`.
+- CI (`.github/workflows/build.yml`) runs on macOS 26 only (the app still targets macOS 14+). Each run produces a DMG artifact named `TeachLens-Dev-dmg-<os>`.
 - `VERSION` drives releases. A suffix such as `-beta.N` publishes a GitHub pre-release (`.github/workflows/release.yml`).
 
 ## Code map (Sources/TeachLensCore)
