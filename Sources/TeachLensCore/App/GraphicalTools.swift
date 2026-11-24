@@ -160,8 +160,22 @@ final class GraphicalTools: ObservableObject {
 
     // MARK: Shortcuts
 
+    /// Shortcuts for the tooltips, read once each time the column opens rather
+    /// than on every redraw (reading Settings decodes many defaults keys).
+    private var shortcutCache: [ToolbarTool: String] = [:]
+
+    private func refreshShortcuts() {
+        var cache: [ToolbarTool: String] = [:]
+        for tool in ToolbarTool.allCases {
+            if let text = readShortcut(for: tool) { cache[tool] = text }
+        }
+        shortcutCache = cache
+    }
+
+    func shortcut(for tool: ToolbarTool) -> String? { shortcutCache[tool] }
+
     /// The tool's current global shortcut, read from Settings, e.g. "⌃4".
-    func shortcut(for tool: ToolbarTool) -> String? {
+    private func readShortcut(for tool: ToolbarTool) -> String? {
         let app = UserDefaultsSettingsStore().load()
         func text(_ code: Int, _ modifiers: UInt) -> String? {
             code == 0 ? nil : HotkeyConflicts.displayString(keyCode: code, modifiers: modifiers)
@@ -334,6 +348,7 @@ final class GraphicalTools: ObservableObject {
     private func expand() {
         guard let panel else { return }
         refreshState()
+        refreshShortcuts()
         idleTask?.cancel()
         idle = false
         // Grow the window first so the column has room to animate into.

@@ -31,12 +31,10 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
     private let onRequestCamera: () -> Void
     private let onOpenTrimEditor: () -> Void
     private let userSelectedResourceAccess: UserSelectedResourceAccess
-    private var settings: AppSettings
     private let keystrokeController: KeystrokeController?
     private let spotlightController: SpotlightController?
     private let teaching: TeachingControllers?
 
-    private static let homepageURLString = "https://github.com/FW1201/TeachLens"
     private static let contentWidth: CGFloat = 540
     private static let panelHorizontalInset: CGFloat = 28
     private static let wrappedLabelWidth: CGFloat = contentWidth - panelHorizontalInset * 2
@@ -91,7 +89,6 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         self.onRequestCamera = onRequestCamera
         self.onOpenTrimEditor = onOpenTrimEditor
         self.userSelectedResourceAccess = userSelectedResourceAccess
-        self.settings = settingsStore.load()
         super.init()
     }
 
@@ -100,14 +97,11 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
     /// and the first "Settings…" opens instantly.
     func prepareWindow() {
         guard window == nil else { return }
-        settings = settingsStore.load()
         window = makeWindow()
         toolModel.window = window
     }
 
     func show() {
-        // Always reflect the latest persisted values when re-opening.
-        settings = settingsStore.load()
 
         if window == nil {
             window = makeWindow()
@@ -508,13 +502,6 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
     /// it floats above other windows so it can never get lost behind them. If it
     /// did, TeachLens's hotkeys (suspended while the dialog is open) would stay
     /// suspended and the app would appear broken with no obvious way to recover.
-    /// Puts an SF Symbol before a push button's title, so every settings
-    /// button carries an icon like the rest of TeachLens.
-    static func addSymbol(_ button: NSButton, _ name: String) {
-        button.image = AppDelegate.menuSymbol(name)
-        button.imagePosition = .imageLeading
-    }
-
     static func configureAlwaysOnTop(_ window: NSWindow) {
         window.level = .floating
         window.hidesOnDeactivate = false
@@ -655,43 +642,9 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         return stack
     }
 
-    /// Builds a borderless button styled as a web hyperlink to the TeachLens
-    /// home page.
-    private func makeLink(title: String) -> NSButton {
-        let button = LinkButton(title: title, target: self, action: #selector(openHomepage(_:)))
-        button.isBordered = false
-        button.bezelStyle = .inline
-        button.attributedTitle = NSAttributedString(
-            string: title,
-            attributes: [
-                .foregroundColor: NSColor.linkColor,
-                .underlineStyle: NSUnderlineStyle.single.rawValue,
-                .font: NSFont.systemFont(ofSize: 11)
-            ]
-        )
-        button.toolTip = SettingsWindowController.homepageURLString
-        button.setAccessibilityRole(.link)
-        return button
-    }
-
     @objc private func openForkPage(_ sender: Any?) {
         guard let url = URL(string: AppInfo.forkURL) else { return }
         NSWorkspace.shared.open(url)
-    }
-
-    @objc private func openHomepage(_ sender: Any?) {
-        guard let url = URL(string: SettingsWindowController.homepageURLString) else { return }
-        NSWorkspace.shared.open(url)
-    }
-
-    private func makeColumn(_ rows: [NSView], spacing: CGFloat = 14) -> NSView {
-        let stack = NSStackView(views: rows)
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = spacing
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        stack.edgeInsets = NSEdgeInsets(top: 8, left: Self.panelHorizontalInset, bottom: 12, right: Self.panelHorizontalInset)
-        return stack
     }
 
     private func makeLabel(_ text: String, wraps: Bool = false) -> NSTextField {
@@ -704,76 +657,6 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         }
         return field
     }
-
-    private func makeSectionLabel(_ text: String) -> NSTextField {
-        let field = makeLabel(text)
-        field.font = NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .semibold)
-        return field
-    }
-
-    private func makeRow(_ views: [NSView]) -> NSView {
-        let stack = NSStackView(views: views)
-        stack.orientation = .horizontal
-        stack.alignment = .centerY
-        stack.spacing = 8
-        return stack
-    }
-
-    /// Creates a checkbox styled like the Windows ZoomIt options dialog, where
-    /// the caption sits to the left of the box (BS_LEFTTEXT). Grouping several
-    /// of these in a `makeCheckboxColumn` lines their boxes up in a single
-    /// right-hand column, matching the Windows layout.
-    private func makeCheckbox(_ title: String, action: Selector, state: Bool) -> NSButton {
-        let button = NSButton(checkboxWithTitle: title, target: self, action: action)
-        button.imagePosition = .imageRight
-        button.state = state ? .on : .off
-        return button
-    }
-
-    /// Stacks Windows-style checkboxes so their boxes align in a right-hand
-    /// column, the way the TeachLens options dialog aligns them.
-    private func makeCheckboxColumn(_ checkboxes: [NSView], spacing: CGFloat = 6) -> NSView {
-        let stack = NSStackView(views: checkboxes)
-        stack.orientation = .vertical
-        stack.alignment = .trailing
-        stack.spacing = spacing
-        return stack
-    }
-
-    private func makeIndentedColumn(_ rows: [NSView], indent: CGFloat = 18, spacing: CGFloat = 6) -> NSView {
-        let stack = NSStackView(views: rows)
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = spacing
-        stack.edgeInsets = NSEdgeInsets(top: 0, left: indent, bottom: 0, right: 0)
-        return stack
-    }
-
-    /// Lays out label/control rows in a grid so the leading labels form a
-    /// right-aligned column and the controls line up in consistent columns.
-    /// Rows may have differing numbers of cells; trailing cells are left empty.
-    private func makeFormGrid(_ rows: [[NSView]], rowSpacing: CGFloat = 10, columnSpacing: CGFloat = 8) -> NSGridView {
-        let grid = NSGridView(views: rows)
-        grid.translatesAutoresizingMaskIntoConstraints = false
-        grid.rowSpacing = rowSpacing
-        grid.columnSpacing = columnSpacing
-        // Center controls vertically within each row so labels line up with
-        // popups, steppers and checkboxes regardless of their heights.
-        grid.rowAlignment = .none
-        for r in 0..<grid.numberOfRows {
-            for c in 0..<grid.numberOfColumns {
-                grid.cell(atColumnIndex: c, rowIndex: r).yPlacement = .center
-            }
-        }
-        if grid.numberOfColumns > 0 {
-            // Right-align the leading label column so the controls in column 1
-            // share a common left edge.
-            grid.column(at: 0).xPlacement = .trailing
-        }
-        return grid
-    }
-
-    // MARK: - General tab
 
     // MARK: - Keystrokes tab (TeachLens)
 
@@ -803,50 +686,4 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         let previewSize = min(max(size, 12), 36)
         return AnnotationController.typingFont(named: name, size: previewSize)
     }
-
-    // MARK: - Persistence
-
-    private func persist() {
-        settingsStore.save(settings)
-    }
-
-    private func saveSelection(_ url: URL, for resource: UserSelectedResource) -> Bool {
-        do {
-            try userSelectedResourceAccess.saveSelection(url, for: resource)
-            return true
-        } catch {
-            if DistributionChannel.isAppStore {
-                NSAlert(error: error).runModal()
-                return false
-            }
-            return true
-        }
-    }
-
-    // MARK: - Key formatting
-
-    static func describe(keyCode: Int, modifiers: NSEvent.ModifierFlags) -> String {
-        var result = ""
-        if modifiers.contains(.control) { result += "⌃" }
-        if modifiers.contains(.option) { result += "⌥" }
-        if modifiers.contains(.shift) { result += "⇧" }
-        if modifiers.contains(.command) { result += "⌘" }
-        result += keyName(forKeyCode: keyCode)
-        return result
-    }
-
-    private static func keyName(forKeyCode code: Int) -> String {
-        keyNames[code] ?? "Key \(code)"
-    }
-
-    private static let keyNames: [Int: String] = [
-        0: "A", 1: "S", 2: "D", 3: "F", 4: "H", 5: "G", 6: "Z", 7: "X", 8: "C",
-        9: "V", 11: "B", 12: "Q", 13: "W", 14: "E", 15: "R", 16: "Y", 17: "T",
-        18: "1", 19: "2", 20: "3", 21: "4", 22: "6", 23: "5", 24: "=", 25: "9",
-        26: "7", 27: "-", 28: "8", 29: "0", 30: "]", 31: "O", 32: "U", 33: "[",
-        34: "I", 35: "P", 36: "Return", 37: "L", 38: "J", 39: "'", 40: "K",
-        41: ";", 42: "\\", 43: ",", 44: "/", 45: "N", 46: "M", 47: ".",
-        48: "Tab", 49: "Space", 50: "`", 51: "Delete", 53: "Escape",
-        123: "←", 124: "→", 125: "↓", 126: "↑"
-    ]
 }

@@ -320,12 +320,7 @@ struct KeystrokePillView: View {
 /// and macOS 26 at run time; otherwise the HUD falls back to a frosted
 /// material. When "Reduce transparency" is on, the opaque style is used.
 enum KeystrokeGlassSupport {
-    static var isLiquidGlassAvailable: Bool {
-        #if compiler(>=6.2)
-        if #available(macOS 26.0, *) { return true }
-        #endif
-        return false
-    }
+    static var isLiquidGlassAvailable: Bool { TeachLensChrome.liquidGlassAvailable }
 }
 
 struct KeystrokePillBackground: ViewModifier {

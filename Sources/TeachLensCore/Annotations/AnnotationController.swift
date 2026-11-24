@@ -22,10 +22,6 @@ final class AnnotationController {
         annotations
     }
 
-    var inProgressSnapshot: Annotation? {
-        inProgress
-    }
-
     /// Builds the typing-mode font for the given name and size, falling back to
     /// the semibold system font when no custom font is configured or available.
     static func typingFont(named name: String, size: CGFloat) -> NSFont {

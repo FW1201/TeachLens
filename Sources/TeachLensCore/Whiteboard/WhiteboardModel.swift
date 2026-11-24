@@ -324,6 +324,22 @@ enum WhiteboardRenderer {
         return data as Data
     }
 
+    /// A small image of one page for the page browser, drawn straight to a
+    /// bitmap (no PNG encode/decode round trip).
+    static func thumbnail(_ page: WhiteboardPage, width: Int = 256) -> CGImage? {
+        let size = WhiteboardDocument.canvasSize
+        let height = Int((CGFloat(width) * size.height / size.width).rounded())
+        guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        let scale = CGFloat(width) / size.width
+        context.interpolationQuality = .medium
+        context.translateBy(x: 0, y: CGFloat(height))
+        context.scaleBy(x: scale, y: -scale)
+        draw(page, in: context)
+        return context.makeImage()
+    }
+
     /// A PNG of one page at `scale` × the canvas size.
     static func pngData(_ page: WhiteboardPage, scale: CGFloat = 1) -> Data? {
         let size = WhiteboardDocument.canvasSize

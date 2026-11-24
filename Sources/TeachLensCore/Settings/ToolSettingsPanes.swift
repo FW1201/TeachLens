@@ -46,8 +46,18 @@ enum ToolHotKey: CaseIterable, Sendable {
 @MainActor
 final class ToolSettingsModel: NSObject, ObservableObject {
     @Published var settings: AppSettings {
-        didSet { if settings != oldValue { store.save(settings) } }
+        didSet {
+            guard settings != oldValue else { return }
+            store.save(settings)
+            if settings.recordMicrophone != oldValue.recordMicrophone
+                || settings.microphoneDeviceID != oldValue.microphoneDeviceID {
+                updateNoiseCancellationSupport()
+            }
+        }
     }
+    /// Whether the chosen microphone supports wind-noise removal. Checking
+    /// opens the device, so it is done only when the microphone changes.
+    @Published private(set) var noiseCancellationSupported = false
     @Published private(set) var recording: ToolHotKey?
     /// Why the last recorded shortcut was refused, shown under its row.
     @Published private(set) var conflict: (hotKey: ToolHotKey, message: String)?
@@ -90,6 +100,13 @@ final class ToolSettingsModel: NSObject, ObservableObject {
         self.requestCamera = requestCamera
         self.openTrimEditor = openTrimEditor
         super.init()
+        updateNoiseCancellationSupport()
+    }
+
+    private func updateNoiseCancellationSupport() {
+        let supported = settings.recordMicrophone
+            && AudioDevices.supportsWindNoiseRemoval(deviceID: settings.microphoneDeviceID)
+        if supported != noiseCancellationSupported { noiseCancellationSupported = supported }
     }
 
     /// Picks up values changed elsewhere (menus, course modes) when Settings opens.
@@ -150,7 +167,7 @@ final class ToolSettingsModel: NSObject, ObservableObject {
         if recording == hotKey { return L10n.t("Type shortcut… (Esc cancels)", "請按快捷鍵…（Esc 取消）") }
         let (code, modifiers) = code(hotKey)
         if code == 0 { return L10n.t("None", "無") }
-        return SettingsWindowController.describe(keyCode: code, modifiers: NSEvent.ModifierFlags(rawValue: modifiers))
+        return HotkeyConflicts.displayString(keyCode: code, modifiers: modifiers)
     }
 
     /// Starts recording a shortcut, or stops if one is already being recorded.
@@ -324,9 +341,6 @@ final class ToolSettingsModel: NSObject, ObservableObject {
         settings.typingFontSize = font.pointSize
     }
 
-    var noiseCancellationSupported: Bool {
-        settings.recordMicrophone && AudioDevices.supportsWindNoiseRemoval(deviceID: settings.microphoneDeviceID)
-    }
 }
 
 // MARK: - Shared pieces
