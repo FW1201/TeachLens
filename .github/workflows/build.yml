@@ -12,7 +12,13 @@ permissions:
 jobs:
   build:
     # Package.swift uses swift-tools-version 6.0, which needs Xcode 16+.
-    runs-on: macos-15
+    # macos-26 (Xcode 26) also compiles the Liquid Glass code path, which is
+    # behind `#if compiler(>=6.2)`.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-26]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -40,6 +46,6 @@ jobs:
       - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
-          name: TeachLens-Dev-dmg
+          name: TeachLens-Dev-dmg-${{ matrix.os }}
           path: .build/TeachLens-Dev.dmg
           if-no-files-found: error

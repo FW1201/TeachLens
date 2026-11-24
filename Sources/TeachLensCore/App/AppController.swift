@@ -7,6 +7,7 @@ final class AppController: NSObject {
     private let hotkeyService: HotkeyService
     private let modeCoordinator: ModeCoordinator
     private let userSelectedResourceAccess: UserSelectedResourceAccess
+    let keystrokeController: KeystrokeController
     /// One-shot observer used to re-present the permissions dialog when the user
     /// returns to TeachLens after being sent to System Settings.
     private var permissionReactivationObserver: NSObjectProtocol?
@@ -27,13 +28,15 @@ final class AppController: NSObject {
         permissionService: PermissionService,
         hotkeyService: HotkeyService,
         modeCoordinator: ModeCoordinator,
-        userSelectedResourceAccess: UserSelectedResourceAccess
+        userSelectedResourceAccess: UserSelectedResourceAccess,
+        keystrokeController: KeystrokeController
     ) {
         self.settingsStore = settingsStore
         self.permissionService = permissionService
         self.hotkeyService = hotkeyService
         self.modeCoordinator = modeCoordinator
         self.userSelectedResourceAccess = userSelectedResourceAccess
+        self.keystrokeController = keystrokeController
         super.init()
     }
 
@@ -65,6 +68,10 @@ final class AppController: NSObject {
         modeCoordinator.handle(.toggleBreakTimer)
     }
 
+    @objc func toggleKeystrokes() {
+        keystrokeController.toggle()
+    }
+
     @objc func showSettings() {
         settingsWindowController.show()
     }
@@ -86,6 +93,7 @@ final class AppController: NSObject {
         let micStatus = permissionService.microphoneStatus()
         let speechStatus = permissionService.speechRecognitionStatus()
         let camStatus = permissionService.cameraStatus()
+        let inputMonitoringGranted = InputMonitoringPermission.isGranted
         func describe(_ status: MicrophonePermission) -> String {
             switch status {
             case .granted: return "Granted"
@@ -108,8 +116,9 @@ final class AppController: NSObject {
         Microphone: \(describe(micStatus))
         Speech Recognition: \(describe(speechStatus))
         Camera: \(describe(camStatus))
+        Input Monitoring: \(inputMonitoringGranted ? "Granted" : "Missing")
 
-        Screen Recording is required for zoom, snip, and recording. Microphone and Speech Recognition are optional for snip dictation; Camera is optional for recording.
+        Screen Recording is required for zoom, snip, and recording. Microphone and Speech Recognition are optional for snip dictation; Camera is optional for recording. Input Monitoring is required to show keystrokes.
 
         Newly granted Screen Recording takes effect after you relaunch TeachLens.
         """
@@ -118,6 +127,7 @@ final class AppController: NSObject {
         alert.addButton(withTitle: micStatus == .notDetermined ? "Grant Microphone…" : "Microphone Settings…")
         alert.addButton(withTitle: speechStatus == .notDetermined ? "Grant Speech Recognition…" : "Speech Recognition Settings…")
         alert.addButton(withTitle: camStatus == .notDetermined ? "Grant Camera…" : "Camera Settings…")
+        alert.addButton(withTitle: inputMonitoringGranted ? "Input Monitoring Settings…" : "Grant Input Monitoring…")
         // Use a standard macOS-style rounded-square icon so the dialog matches
         // the look of system permission prompts and the icon top lines up with
         // the message text.
@@ -165,6 +175,13 @@ final class AppController: NSObject {
                 }
             } else {
                 permissionService.openCameraSettings()
+                representWhenActive()
+            }
+        case NSApplication.ModalResponse(rawValue: NSApplication.ModalResponse.alertThirdButtonReturn.rawValue + 3):
+            if !inputMonitoringGranted && InputMonitoringPermission.request() {
+                presentPermissionsDialog()
+            } else {
+                InputMonitoringPermission.openSettings()
                 representWhenActive()
             }
         default:

@@ -63,12 +63,21 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             hotkeyService?.endLiveZoomNavigation()
         }
 
+        let keystrokeController = KeystrokeController()
+        keystrokeController.onHotkeyChange = { [weak hotkeyService] in
+            hotkeyService?.reloadHotkey()
+        }
+        modeCoordinator.onToggleKeystrokes = { [weak keystrokeController] in
+            keystrokeController?.toggle()
+        }
+
         appController = AppController(
             settingsStore: settingsStore,
             permissionService: permissionService,
             hotkeyService: hotkeyService,
             modeCoordinator: modeCoordinator,
-            userSelectedResourceAccess: userSelectedResourceAccess
+            userSelectedResourceAccess: userSelectedResourceAccess,
+            keystrokeController: keystrokeController
         )
 
         statusItem = makeStatusItem(controller: appController!)
@@ -76,6 +85,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.updateRecordingIndicator(recording)
         }
         hotkeyService.start()
+        keystrokeController.start()
 
         // On a fresh install, open Settings so the user has a clear entry point
         // instead of a silent menu-bar-only launch (issue #21). Upgrading users
@@ -137,6 +147,17 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             item.target = controller
         }
 
+        // Keystroke overlay: the toggle shows a checkmark via the keystroke
+        // controller's menu validation, followed by its options submenu.
+        if let index = menu.items.firstIndex(where: { $0.action == #selector(AppController.toggleKeystrokes) }) {
+            let toggleItem = menu.items[index]
+            toggleItem.target = controller.keystrokeController
+            toggleItem.action = #selector(KeystrokeController.toggle)
+            let optionsItem = NSMenuItem(title: "Keystroke Options", action: nil, keyEquivalent: "")
+            optionsItem.submenu = controller.keystrokeController.makeMenu()
+            menu.insertItem(optionsItem, at: index + 1)
+        }
+
         item.menu = menu
         return item
     }
@@ -173,6 +194,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             StatusMenuEntry(title: "Panorama Capture", action: #selector(AppController.startPanorama), keyEquivalent: ""),
             StatusMenuEntry(title: "DemoMirror", action: #selector(AppController.toggleDemoMirror), keyEquivalent: ""),
             StatusMenuEntry(title: "Break Timer", action: #selector(AppController.toggleBreakTimer), keyEquivalent: ""),
+            StatusMenuEntry(title: "Show Keystrokes", action: #selector(AppController.toggleKeystrokes), keyEquivalent: ""),
             .separator,
             StatusMenuEntry(title: "Check Permissions", action: #selector(AppController.checkPermissions), keyEquivalent: ""),
             StatusMenuEntry(title: "Quit", action: #selector(AppController.quit), keyEquivalent: "q")

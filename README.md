@@ -2,7 +2,7 @@
 
 TeachLens is a macOS menu-bar toolkit for online teaching and screen-based lectures. It combines screen zoom, live zoom, on-screen drawing, a break timer, snips/OCR, and screen recording, and its roadmap adds keystroke and mouse visualization, spotlight, course-mode presets, live captions, and a multi-page whiteboard.
 
-> **Status:** M0 (foundation). The current build is the ZoomIt for Mac feature set under the TeachLens name. See [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md) for the roadmap.
+> **Status:** M1 (keystroke visualization). The ZoomIt for Mac feature set plus a Swift port of Keyviz's keystroke and mouse-click display, drawn as a frosted pill (Liquid Glass on macOS 26 and later). See [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md) for the roadmap.
 
 ## Credits and open-source origins
 
@@ -26,6 +26,7 @@ TeachLens as a whole is distributed under the **GNU GPL-3.0** ([LICENSE](LICENSE
 | Record screen / region | Control+5 / Control+Shift+5 |
 | Snip to clipboard / file / OCR | Control+6 / Control+Shift+6 / Control+Option+6 |
 | Panorama to clipboard / file | Control+8 / Control+Shift+8 |
+| Show / hide keystrokes | Control+0 |
 
 All hotkeys are configurable in Settings.
 
@@ -52,6 +53,7 @@ All hotkeys are configurable in Settings.
 - macOS 14 or newer.
 - Xcode command-line tools.
 - Screen Recording permission for capture.
+- Input Monitoring permission to show keystrokes (System Settings ▸ Privacy & Security ▸ Input Monitoring).
 - Microphone and Speech Recognition permissions are required only for microphone recording and optional snip dictation; Camera is required only for the webcam option.
 
 ## Build, Test, Run

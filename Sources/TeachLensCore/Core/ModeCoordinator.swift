@@ -63,6 +63,8 @@ final class ModeCoordinator {
     /// hotkeys can be registered only while live zoom is active.
     var onBeginLiveZoomNavigation: (() -> Void)?
     var onEndLiveZoomNavigation: (() -> Void)?
+    /// Toggles the keystroke overlay (owned by KeystrokeController).
+    var onToggleKeystrokes: (() -> Void)?
 
     init(
         settingsStore: SettingsStore,
@@ -143,6 +145,8 @@ final class ModeCoordinator {
         #endif
         case .toggleBreakTimer:
             toggleBreakTimer()
+        case .toggleKeystrokes:
+            onToggleKeystrokes?()
         case .toggleDemoMirror(let scope):
             demoMirrorController.toggle(scope: scope)
         case .setTool(let tool):

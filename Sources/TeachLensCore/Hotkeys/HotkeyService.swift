@@ -23,6 +23,7 @@ final class HotkeyService {
     private var demoMirrorRegionHotKeyRef: EventHotKeyRef?
     private var demoMirrorWindowHotKeyRef: EventHotKeyRef?
     private var breakHotKeyRef: EventHotKeyRef?
+    private var keystrokeHotKeyRef: EventHotKeyRef?
     private var zoomInNavRef: EventHotKeyRef?
     private var zoomOutNavRef: EventHotKeyRef?
     private var eventHandlerRef: EventHandlerRef?
@@ -141,6 +142,7 @@ final class HotkeyService {
                 case 16: command = .toggleDemoMirror(scope: .screen)
                 case 17: command = .toggleDemoMirror(scope: .region)
                 case 18: command = .toggleDemoMirror(scope: .window)
+                case 19: command = .toggleKeystrokes
                 default: return noErr
                 }
 
@@ -308,6 +310,20 @@ final class HotkeyService {
             &breakHotKeyRef
         )
 
+        // Keystroke overlay toggle (TeachLens addition, default Control+0).
+        let keystrokeSettings = KeystrokeSettingsStore().load()
+        if keystrokeSettings.toggleKeyCode != 0 {
+            let keystrokeModifiers = NSEvent.ModifierFlags(rawValue: keystrokeSettings.toggleModifiers)
+            RegisterEventHotKey(
+                UInt32(keystrokeSettings.toggleKeyCode),
+                carbonModifiers(from: keystrokeModifiers),
+                EventHotKeyID(signature: signature, id: 19),
+                target,
+                0,
+                &keystrokeHotKeyRef
+            )
+        }
+
         // DemoMirror: the base shortcut mirrors the whole screen; the same
         // shortcut with Shift toggled selects a region to mirror; with Option
         // toggled it mirrors the window under the cursor.
@@ -409,6 +425,10 @@ final class HotkeyService {
             UnregisterEventHotKey(breakHotKeyRef)
         }
         breakHotKeyRef = nil
+        if let keystrokeHotKeyRef {
+            UnregisterEventHotKey(keystrokeHotKeyRef)
+        }
+        keystrokeHotKeyRef = nil
     }
 
     private func carbonModifiers(from flags: NSEvent.ModifierFlags) -> UInt32 {
