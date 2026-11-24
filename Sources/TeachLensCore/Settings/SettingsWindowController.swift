@@ -452,6 +452,13 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
     /// it floats above other windows so it can never get lost behind them. If it
     /// did, TeachLens's hotkeys (suspended while the dialog is open) would stay
     /// suspended and the app would appear broken with no obvious way to recover.
+    /// Puts an SF Symbol before a push button's title, so every settings
+    /// button carries an icon like the rest of TeachLens.
+    static func addSymbol(_ button: NSButton, _ name: String) {
+        button.image = AppDelegate.menuSymbol(name)
+        button.imagePosition = .imageLeading
+    }
+
     static func configureAlwaysOnTop(_ window: NSWindow) {
         window.level = .floating
         window.hidesOnDeactivate = false
@@ -796,6 +803,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
 
         let hotKeyButton = NSButton(title: zoomHotKeyDisplayString(), target: self, action: #selector(toggleZoomHotKeyRecording(_:)))
         hotKeyButton.bezelStyle = .rounded
+        Self.addSymbol(hotKeyButton, "keyboard")
         hotKeyButton.setButtonType(.momentaryPushIn)
         hotKeyButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 140).isActive = true
         self.hotKeyButton = hotKeyButton
@@ -834,6 +842,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
 
         let liveHotKeyButton = NSButton(title: liveHotKeyDisplayString(), target: self, action: #selector(toggleLiveHotKeyRecording(_:)))
         liveHotKeyButton.bezelStyle = .rounded
+        Self.addSymbol(liveHotKeyButton, "keyboard")
         liveHotKeyButton.setButtonType(.momentaryPushIn)
         liveHotKeyButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 140).isActive = true
         self.liveHotKeyButton = liveHotKeyButton
@@ -1234,6 +1243,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
 
         let drawHotKeyButton = NSButton(title: drawHotKeyDisplayString(), target: self, action: #selector(toggleDrawHotKeyRecording(_:)))
         drawHotKeyButton.bezelStyle = .rounded
+        Self.addSymbol(drawHotKeyButton, "keyboard")
         drawHotKeyButton.setButtonType(.momentaryPushIn)
         drawHotKeyButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 140).isActive = true
         self.drawHotKeyButton = drawHotKeyButton
@@ -1269,6 +1279,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
 
         let fontButton = NSButton(title: L10n.t("Select Font…", "選擇字體…"), target: self, action: #selector(selectFont(_:)))
         fontButton.bezelStyle = .rounded
+        Self.addSymbol(fontButton, "textformat")
 
         let fontRow = makeRow([makeLabel(L10n.t("Typing font:", "打字字體：")), fontButton])
 
@@ -1285,6 +1296,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
 
         let hotKeyButton = NSButton(title: breakHotKeyDisplayString(), target: self, action: #selector(toggleBreakHotKeyRecording(_:)))
         hotKeyButton.bezelStyle = .rounded
+        Self.addSymbol(hotKeyButton, "keyboard")
         hotKeyButton.setButtonType(.momentaryPushIn)
         hotKeyButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 140).isActive = true
         breakHotKeyButton = hotKeyButton
@@ -1327,6 +1339,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         breakSoundFileField = soundField
         let soundBrowse = NSButton(title: L10n.t("Browse…", "瀏覽…"), target: self, action: #selector(chooseBreakSoundFile(_:)))
         soundBrowse.bezelStyle = .rounded
+        Self.addSymbol(soundBrowse, "folder")
 
         let backgroundModePopup = makeIndexedPopup(
             titles: [L10n.t("No image", "無圖片"), L10n.t("Faded desktop", "淡化桌面"), L10n.t("Image file", "圖片檔")],
@@ -1339,6 +1352,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         breakBackgroundFileField = backgroundField
         let backgroundBrowse = NSButton(title: L10n.t("Browse…", "瀏覽…"), target: self, action: #selector(chooseBreakBackgroundFile(_:)))
         backgroundBrowse.bezelStyle = .rounded
+        Self.addSymbol(backgroundBrowse, "folder")
         breakBackgroundBrowseButton = backgroundBrowse
         let stretchCheck = makeCheckbox(L10n.t("Scale to screen:", "縮放至螢幕大小："), action: #selector(breakBackgroundStretchChanged(_:)), state: settings.breakBackgroundStretch)
         breakBackgroundStretchCheckbox = stretchCheck
@@ -1490,6 +1504,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
 
         let snipHotKeyButton = NSButton(title: snipHotKeyDisplayString(), target: self, action: #selector(toggleSnipHotKeyRecording(_:)))
         snipHotKeyButton.bezelStyle = .rounded
+        Self.addSymbol(snipHotKeyButton, "keyboard")
         snipHotKeyButton.setButtonType(.momentaryPushIn)
         snipHotKeyButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 140).isActive = true
         self.snipHotKeyButton = snipHotKeyButton
@@ -1497,6 +1512,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
 
         let snipOcrHotKeyButton = NSButton(title: snipOcrHotKeyDisplayString(), target: self, action: #selector(toggleSnipOcrHotKeyRecording(_:)))
         snipOcrHotKeyButton.bezelStyle = .rounded
+        Self.addSymbol(snipOcrHotKeyButton, "keyboard")
         snipOcrHotKeyButton.setButtonType(.momentaryPushIn)
         snipOcrHotKeyButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 140).isActive = true
         self.snipOcrHotKeyButton = snipOcrHotKeyButton
@@ -1532,6 +1548,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         snipSaveDirectoryField = directoryField
         let directoryBrowse = NSButton(title: L10n.t("Browse…", "瀏覽…"), target: self, action: #selector(chooseSnipSaveDirectory(_:)))
         directoryBrowse.bezelStyle = .rounded
+        Self.addSymbol(directoryBrowse, "folder")
         snipSaveDirectoryBrowseButton = directoryBrowse
         let directoryRow = makeIndentedColumn([makeRow([makeLabel(L10n.t("Folder:", "資料夾：")), directoryField, directoryBrowse])])
 
@@ -1605,6 +1622,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
 
         let recordHotKeyButton = NSButton(title: recordHotKeyDisplayString(), target: self, action: #selector(toggleRecordHotKeyRecording(_:)))
         recordHotKeyButton.bezelStyle = .rounded
+        Self.addSymbol(recordHotKeyButton, "keyboard")
         recordHotKeyButton.setButtonType(.momentaryPushIn)
         recordHotKeyButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 140).isActive = true
         self.recordHotKeyButton = recordHotKeyButton
@@ -1625,6 +1643,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
 
         let trimButton = NSButton(title: L10n.t("Trim…", "剪輯…"), target: self, action: #selector(openTrimEditor(_:)))
         trimButton.bezelStyle = .rounded
+        Self.addSymbol(trimButton, "scissors")
         let trimRow = makeRow([makeLabel(L10n.t("Edit existing video:", "剪輯現有影片：")), trimButton])
 
         return makeColumn([help, recordHotKeyRow, makeCheckboxColumn([systemAudioCheck, micCheck]), micOptions] + makeWebcamRows() + [trimRow], spacing: 10)
@@ -1640,6 +1659,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
 
         let panoramaHotKeyButton = NSButton(title: panoramaHotKeyDisplayString(), target: self, action: #selector(togglePanoramaHotKeyRecording(_:)))
         panoramaHotKeyButton.bezelStyle = .rounded
+        Self.addSymbol(panoramaHotKeyButton, "keyboard")
         panoramaHotKeyButton.setButtonType(.momentaryPushIn)
         panoramaHotKeyButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 140).isActive = true
         self.panoramaHotKeyButton = panoramaHotKeyButton
@@ -1663,6 +1683,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
 
         let demoMirrorHotKeyButton = NSButton(title: demoMirrorHotKeyDisplayString(), target: self, action: #selector(toggleDemoMirrorHotKeyRecording(_:)))
         demoMirrorHotKeyButton.bezelStyle = .rounded
+        Self.addSymbol(demoMirrorHotKeyButton, "keyboard")
         demoMirrorHotKeyButton.setButtonType(.momentaryPushIn)
         demoMirrorHotKeyButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 140).isActive = true
         self.demoMirrorHotKeyButton = demoMirrorHotKeyButton
@@ -1935,6 +1956,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
 
         let demoTypeHotKeyButton = NSButton(title: demoTypeHotKeyDisplayString(), target: self, action: #selector(toggleDemoTypeHotKeyRecording(_:)))
         demoTypeHotKeyButton.bezelStyle = .rounded
+        Self.addSymbol(demoTypeHotKeyButton, "keyboard")
         demoTypeHotKeyButton.setButtonType(.momentaryPushIn)
         demoTypeHotKeyButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 140).isActive = true
         self.demoTypeHotKeyButton = demoTypeHotKeyButton
@@ -1942,8 +1964,9 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
 
         let fileField = makePathField(settings.demoTypeFile)
         demoTypeFileField = fileField
-        let browseButton = NSButton(title: "...", target: self, action: #selector(chooseDemoTypeFile(_:)))
+        let browseButton = NSButton(title: L10n.t("Browse…", "瀏覽…"), target: self, action: #selector(chooseDemoTypeFile(_:)))
         browseButton.bezelStyle = .rounded
+        Self.addSymbol(browseButton, "folder")
         let fileRow = makeRow([makeLabel(L10n.t("Input file:", "輸入檔案：")), fileField, browseButton])
 
         let speedSlider = NSSlider(value: Double(min(max(settings.demoTypeSpeed, 10), 100)), minValue: 10, maxValue: 100, target: self, action: #selector(demoTypeSpeedChanged(_:)))

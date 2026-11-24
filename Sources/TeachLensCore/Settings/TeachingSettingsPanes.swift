@@ -43,14 +43,17 @@ struct CaptionSettingsPane: View {
             }
             Section(L10n.t("Transcript", "逐字稿")) {
                 HStack {
-                    Button(".srt") { controller.exportSRT() }
-                    Button(".vtt") { controller.exportVTT() }
-                    Button(".txt") { controller.exportTXT() }
+                    Button { controller.exportSRT() } label: { Label(".srt", systemImage: "captions.bubble") }
+                    Button { controller.exportVTT() } label: { Label(".vtt", systemImage: "globe") }
+                    Button { controller.exportTXT() } label: { Label(".txt", systemImage: "doc.plaintext") }
                     Spacer()
-                    Button(L10n.t("Clear", "清除")) { controller.clearTranscript() }
+                    Button(role: .destructive) { controller.clearTranscript() } label: { Label(L10n.t("Clear", "清除"), systemImage: "trash") }
                 }
-                Button(L10n.t("Export captions for the last recording (.srt)", "匯出上一段錄影的字幕（.srt）")) {
+                Button {
                     controller.exportLastRecording()
+                } label: {
+                    Label(L10n.t("Export captions for the last recording (.srt)", "匯出上一段錄影的字幕（.srt）"),
+                          systemImage: "record.circle")
                 }
                 .disabled(controller.lastRecording == nil)
                 Text(L10n.t("You choose where each file is saved; TeachLens then offers to show it in Finder.",
@@ -98,9 +101,11 @@ struct CourseModeSettingsPane: View {
                         if mode.id == controller.currentModeID {
                             Text(L10n.t("In use", "使用中")).font(.caption).foregroundStyle(.green)
                         }
-                        Button(L10n.t("Apply", "套用")) {
+                        Button {
                             controller.apply(mode)
                             refresh += 1
+                        } label: {
+                            Label(L10n.t("Apply", "套用"), systemImage: "checkmark.circle")
                         }
                     }
                 }
@@ -108,11 +113,11 @@ struct CourseModeSettingsPane: View {
             .id(refresh)
             Section {
                 HStack {
-                    Button(L10n.t("Save current setup…", "存成新模式…")) { controller.saveCurrent(); refresh += 1 }
-                    Button(L10n.t("Import…", "匯入…")) { controller.importModes(); refresh += 1 }
-                    Button(L10n.t("Export…", "匯出…")) { controller.exportModes() }
+                    Button { controller.saveCurrent(); refresh += 1 } label: { Label(L10n.t("Save current setup…", "存成新模式…"), systemImage: "plus.square.on.square") }
+                    Button { controller.importModes(); refresh += 1 } label: { Label(L10n.t("Import…", "匯入…"), systemImage: "square.and.arrow.down") }
+                    Button { controller.exportModes() } label: { Label(L10n.t("Export…", "匯出…"), systemImage: "square.and.arrow.up") }
                     Spacer()
-                    Button(L10n.t("Remove custom", "移除自訂")) { controller.removeCustomModes(); refresh += 1 }
+                    Button(role: .destructive) { controller.removeCustomModes(); refresh += 1 } label: { Label(L10n.t("Remove custom", "移除自訂"), systemImage: "trash") }
                         .disabled(controller.customModes.isEmpty)
                 }
                 Text(L10n.t("Restoring a mode at launch never turns on the microphone or the break timer.",
@@ -146,12 +151,12 @@ struct WhiteboardSettingsPane: View {
             Section {
                 LabeledContent(L10n.t("Shortcut", "快捷鍵"), value: "⌃⇧W")
                 LabeledContent(L10n.t("Pages", "頁數"), value: "\(controller.pageCount)")
-                Button(L10n.t("Open whiteboard", "打開白板")) { controller.show() }
+                Button { controller.show() } label: { Label(L10n.t("Open whiteboard", "打開白板"), systemImage: "rectangle.and.pencil.and.ellipsis") }
             }
             Section(L10n.t("Export", "匯出")) {
                 HStack {
-                    Button(L10n.t("All pages as PDF…", "全部頁面存成 PDF…")) { controller.exportPDF() }
-                    Button(L10n.t("Current page as PNG…", "本頁存成 PNG…")) { controller.exportPNG() }
+                    Button { controller.exportPDF() } label: { Label(L10n.t("All pages as PDF…", "全部頁面存成 PDF…"), systemImage: "doc.richtext") }
+                    Button { controller.exportPNG() } label: { Label(L10n.t("Current page as PNG…", "本頁存成 PNG…"), systemImage: "photo") }
                 }
                 LabeledContent(L10n.t("Auto-saved to", "自動保存位置")) {
                     Button(controller.saveLocation.deletingLastPathComponent().lastPathComponent) {

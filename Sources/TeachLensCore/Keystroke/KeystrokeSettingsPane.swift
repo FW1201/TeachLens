@@ -92,9 +92,11 @@ struct KeystrokeSettingsPane: View {
                               systemImage: permissionGranted ? "checkmark.circle.fill" : "xmark.octagon.fill")
                             .foregroundStyle(permissionGranted ? .green : .red)
                         if !permissionGranted {
-                            Button(L10n.t("Open Settings…", "打開系統設定…")) {
+                            Button {
                                 InputMonitoringPermission.request()
                                 InputMonitoringPermission.openSettings()
+                            } label: {
+                                Label(L10n.t("Open Settings…", "打開系統設定…"), systemImage: "gearshape")
                             }
                         }
                     }

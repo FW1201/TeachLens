@@ -104,6 +104,11 @@ public enum SelfTestRunner {
             "Expected the settings version to fall back to CFBundleVersion"
         )
         try expect(
+            AppInfo.resolveVersion(from: ["TeachLensDisplayVersion": "1.3.0-beta.1",
+                                          "CFBundleShortVersionString": "1.3.0"]) == "1.3.0-beta.1",
+            "Expected a beta build to show its full version label"
+        )
+        try expect(
             AppInfo.resolveVersion(from: nil) == "Development",
             "Expected an unbundled development build to identify itself as Development"
         )

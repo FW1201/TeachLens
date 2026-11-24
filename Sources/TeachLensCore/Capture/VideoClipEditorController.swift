@@ -27,9 +27,9 @@ final class VideoClipEditorController: NSObject, NSWindowDelegate, VideoTimeline
 
         var title: String {
             switch self {
-            case .fadeBlack: "Fade to Black"
-            case .none: "No Transition"
-            case .fadeWhite: "Fade to White"
+            case .fadeBlack: L10n.t("Fade to Black", "淡出到黑")
+            case .none: L10n.t("No Transition", "無轉場")
+            case .fadeWhite: L10n.t("Fade to White", "淡出到白")
             }
         }
     }
@@ -119,7 +119,7 @@ final class VideoClipEditorController: NSObject, NSWindowDelegate, VideoTimeline
             backing: .buffered, defer: false
         )
         win.editorController = self
-        win.title = "TeachLens: Edit Recording"
+        win.title = L10n.t("TeachLens: Edit Recording", "TeachLens：剪輯錄影")
         win.delegate = self
         win.center()
         win.isReleasedWhenClosed = false
@@ -178,26 +178,33 @@ final class VideoClipEditorController: NSObject, NSWindowDelegate, VideoTimeline
         transport.addSubview(volume)
         content.addSubview(transport)
 
-        let append = NSButton(title: "Append…", target: self, action: #selector(appendClip))
+        let append = NSButton(title: L10n.t("Append…", "接上影片…"), target: self, action: #selector(appendClip))
         append.bezelStyle = .rounded
-        deleteButton = NSButton(title: "Delete Region", target: self, action: #selector(commitPendingDelete))
+        append.image = NSImage(systemSymbolName: "plus.rectangle.on.rectangle", accessibilityDescription: nil)
+        append.imagePosition = .imageLeading
+        deleteButton = NSButton(title: L10n.t("Delete Region", "刪除選取片段"), target: self, action: #selector(commitPendingDelete))
         deleteButton.bezelStyle = .rounded
         deleteButton.image = NSImage(systemSymbolName: "trash", accessibilityDescription: nil)
         deleteButton.imagePosition = .imageLeading
         deleteButton.contentTintColor = .systemRed
-        deleteButton.toolTip = "Delete selected timeline region (Delete). Undo with Command-Z."
+        deleteButton.toolTip = L10n.t("Delete selected timeline region (Delete). Undo with Command-Z.",
+                                      "刪除時間軸上選取的片段（Delete），可用 ⌘Z 復原。")
         deleteButton.isEnabled = false
-        let transitionLabel = NSTextField(labelWithString: "Transition:")
+        let transitionLabel = NSTextField(labelWithString: L10n.t("Transition:", "轉場："))
         transitionLabel.textColor = .secondaryLabelColor
         transitionPopup = NSPopUpButton()
         transitionPopup.addItems(withTitles: Transition.allCases.map(\.title))
         transitionPopup.selectItem(at: Transition.allCases.firstIndex(of: selectedTransition) ?? 0)
         transitionPopup.target = self
         transitionPopup.action = #selector(transitionChanged)
-        let cancel = NSButton(title: "Cancel", target: self, action: #selector(cancel))
+        let cancel = NSButton(title: L10n.t("Cancel", "取消"), target: self, action: #selector(cancel))
         cancel.bezelStyle = .rounded
-        let save = NSButton(title: "Save…", target: self, action: #selector(save))
+        cancel.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: nil)
+        cancel.imagePosition = .imageLeading
+        let save = NSButton(title: L10n.t("Save…", "儲存…"), target: self, action: #selector(save))
         save.bezelStyle = .rounded
+        save.image = NSImage(systemSymbolName: "square.and.arrow.down", accessibilityDescription: nil)
+        save.imagePosition = .imageLeading
         save.keyEquivalent = "\r"
         let transitionControls = NSStackView(views: [transitionLabel, transitionPopup])
         transitionControls.spacing = 6
@@ -432,7 +439,7 @@ final class VideoClipEditorController: NSObject, NSWindowDelegate, VideoTimeline
         pause()
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.mpeg4Movie, .quickTimeMovie]
-        panel.title = "Select Video to Append"
+        panel.title = L10n.t("Select Video to Append", "選擇要接上的影片")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let asset = AVURLAsset(url: url)
         segments.append(ClipSegment(asset: asset, range: CMTimeRange(start: .zero, duration: asset.duration)))

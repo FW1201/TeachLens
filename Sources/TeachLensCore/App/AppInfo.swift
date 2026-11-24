@@ -24,6 +24,8 @@ public enum AppInfo {
         }
         return "unknown"
     }
+    /// True for alpha, beta and release-candidate builds.
+    public static var isPrerelease: Bool { version.contains("-") }
     public static let copyright = "Copyright © 2026 TeachLens contributors"
     /// Open-source credits shown in Settings. TeachLens is built on ZoomIt for
     /// Mac (Microsoft, MIT) and Keyviz (Rahul Mula, GPL-3.0); see
@@ -36,7 +38,8 @@ public enum AppInfo {
     public static let repositoryURL = "https://github.com/FW1201/TeachLens"
 
     static func resolveVersion(from infoDictionary: [String: Any]?) -> String {
-        for key in ["CFBundleShortVersionString", "CFBundleVersion"] {
+        // The full label, including a pre-release tag such as "1.3.0-beta.1".
+        for key in ["TeachLensDisplayVersion", "CFBundleShortVersionString", "CFBundleVersion"] {
             if let value = infoDictionary?[key] as? String, !value.isEmpty {
                 return value
             }

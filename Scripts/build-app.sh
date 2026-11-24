@@ -24,14 +24,18 @@ esac
 # Local builds default to 1.0 when TEACHLENS_VERSION is absent. An explicitly
 # empty value still fails, which prevents a queued official build from silently
 # using the development default. Restrict the value to dotted numeric
-# components so it is valid for both macOS bundle version keys and cannot
-# inject content into the generated plist.
-VERSION="${TEACHLENS_VERSION-1.0}"
-VERSION_PATTERN='^[0-9]+\.[0-9]+(\.[0-9]+)?$'
-if [[ ! "$VERSION" =~ $VERSION_PATTERN ]]; then
-    echo "error: TEACHLENS_VERSION must be a dotted numeric version such as 1.0 or 1.0.0 (got '$VERSION')." >&2
+# components, optionally followed by a pre-release tag (1.3.0-beta.1), so it
+# cannot inject content into the generated plist.
+DISPLAY_VERSION="${TEACHLENS_VERSION-1.0}"
+VERSION_PATTERN='^[0-9]+\.[0-9]+(\.[0-9]+)?(-(alpha|beta|rc)\.[0-9]+)?$'
+if [[ ! "$DISPLAY_VERSION" =~ $VERSION_PATTERN ]]; then
+    echo "error: TEACHLENS_VERSION must look like 1.0, 1.0.0 or 1.0.0-beta.1 (got '$DISPLAY_VERSION')." >&2
     exit 2
 fi
+# macOS bundle versions must be numeric: 1.3.0-beta.1 is stored as version
+# and build 1.3.0, and the full label goes in TeachLensDisplayVersion, which
+# the app shows in Settings and diagnostics.
+VERSION="${DISPLAY_VERSION%%-*}"
 BUILD_NUMBER="${TEACHLENS_BUILD_NUMBER:-$VERSION}"
 BUILD_NUMBER_PATTERN='^[0-9]+(\.[0-9]+){0,2}$'
 if [[ ! "$BUILD_NUMBER" =~ $BUILD_NUMBER_PATTERN ]]; then
@@ -174,6 +178,8 @@ cat > "$APP_PATH/Contents/Info.plist" <<PLIST
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
     <string>$VERSION</string>
+    <key>TeachLensDisplayVersion</key>
+    <string>$DISPLAY_VERSION</string>
     <key>TeachLensCommit</key>
     <string>$COMMIT</string>
     <key>CFBundleVersion</key>
@@ -235,7 +241,7 @@ fi
 echo "$APP_PATH"
 echo "  bundle id:    $BUNDLE_ID" >&2
 echo "  display name: $DISPLAY_NAME" >&2
-echo "  version:      $VERSION" >&2
+echo "  version:      $DISPLAY_VERSION ($VERSION)" >&2
 echo "  build:        $BUILD_NUMBER" >&2
 echo "  distribution: $DIST_DISTRIBUTION" >&2
 echo "  signed with:  $SIGN_DESC" >&2

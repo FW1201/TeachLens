@@ -43,7 +43,9 @@ jobs:
       - name: Package release app and DMG
         run: |
           TEACHLENS_VERSION="$(tr -d '[:space:]' < VERSION)" zsh Scripts/build-app.sh release
-          test "$(defaults read "$PWD/.build/TeachLens (Dev).app/Contents/Info" CFBundleShortVersionString)" = "$(tr -d '[:space:]' < VERSION)"
+          FULL_VERSION="$(tr -d '[:space:]' < VERSION)"
+          test "$(defaults read "$PWD/.build/TeachLens (Dev).app/Contents/Info" CFBundleShortVersionString)" = "${FULL_VERSION%%-*}"
+          test "$(defaults read "$PWD/.build/TeachLens (Dev).app/Contents/Info" TeachLensDisplayVersion)" = "$FULL_VERSION"
           STAGE="$(mktemp -d)"
           ditto ".build/TeachLens (Dev).app" "$STAGE/TeachLens (Dev).app"
           ln -s /Applications "$STAGE/Applications"
