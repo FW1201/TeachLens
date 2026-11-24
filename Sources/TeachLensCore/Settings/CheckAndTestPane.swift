@@ -70,7 +70,9 @@ struct CheckAndTestPane: View {
                 }
                 testRow("caption", L10n.t("Sample caption", "字幕示範"),
                         L10n.t("No microphone needed", "不需要麥克風")) {
-                    controllers.captions.showSample()
+                    if !controllers.captions.showSample() {
+                        results["caption"] = L10n.t("Stop live captions before the demo", "請先停止即時字幕再播放示範")
+                    }
                 }
                 testRow("board", L10n.t("Open whiteboard", "打開白板"), nil) {
                     controllers.whiteboard.show()
@@ -93,6 +95,9 @@ struct CheckAndTestPane: View {
             }
 
             Section(L10n.t("Course modes", "課程模式")) {
+                Text(L10n.t("Trying Break starts a timer. Exit it separately with Esc.",
+                            "試用「休息」會啟動計時器；請另外按 Esc 結束計時。"))
+                    .font(.caption).foregroundStyle(.secondary)
                 HStack {
                     ForEach(CourseMode.builtIns) { mode in
                         Button(mode.name) {
@@ -104,8 +109,12 @@ struct CheckAndTestPane: View {
                 }
                 HStack {
                     Button(L10n.t("Restore previous setup", "回到原本設定")) {
-                        controllers.courseModes.restoreTestState()
-                        results["modes"] = L10n.t("✓ Restored", "✓ 已還原")
+                        if controllers.courseModes.hasRestorePoint {
+                            controllers.courseModes.restoreTestState()
+                            results["modes"] = L10n.t("Restored", "已還原")
+                        } else {
+                            results["modes"] = L10n.t("No previous test setup", "沒有可還原的試用設定")
+                        }
                     }
                     if let result = results["modes"] {
                         Text(result).foregroundStyle(.green).font(.caption)
@@ -142,11 +151,16 @@ struct CheckAndTestPane: View {
             }
             Spacer()
             if let result = results[id] {
-                Text(result).font(.caption).foregroundStyle(.green)
+                Text(result).font(.caption).foregroundStyle(.secondary)
             }
             Button(L10n.t("Run", "立即測試")) {
+                results[id] = nil
                 action()
-                results[id] = L10n.t("✓ Ran", "✓ 已執行") + " " + Date().formatted(date: .omitted, time: .standard)
+                // Dispatch is not proof that permissions were granted or that an
+                // overlay appeared; invite the teacher to verify the result.
+                if id != "caption" || results[id] != L10n.t("Stop live captions before the demo", "請先停止即時字幕再播放示範") {
+                    results[id] = L10n.t("Requested — check the screen", "已送出操作，請確認畫面")
+                }
             }
         }
     }

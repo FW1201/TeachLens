@@ -99,6 +99,7 @@ final class CaptionController: NSObject, NSMenuItemValidation {
     private var timer: Timer?
     private var sessionStart: TimeInterval = 0
     private var lastShownAt: TimeInterval = 0
+    private var sampleGeneration = 0
 
     private(set) var transcript: [CaptionSegment] = []
     private var recordingStart: TimeInterval?
@@ -335,7 +336,12 @@ final class CaptionController: NSObject, NSMenuItemValidation {
     // MARK: Overlay
 
     /// Shows a sample caption without the microphone (Settings ▸ Check & Test).
-    func showSample() {
+    @discardableResult
+    func showSample() -> Bool {
+        // Do not replace real speech with demo text during a live lesson.
+        guard !isRunning else { return false }
+        sampleGeneration += 1
+        let generation = sampleGeneration
         ensurePanel()
         model.status = nil
         model.text = L10n.t("This is a sample caption. Live captions appear here while you speak.",
@@ -343,10 +349,11 @@ final class CaptionController: NSObject, NSMenuItemValidation {
         lastShownAt = Self.now()
         Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 4_000_000_000)
-            guard let self, !self.isRunning else { return }
+            guard let self, !self.isRunning, self.sampleGeneration == generation else { return }
             self.model.text = ""
             self.panel?.orderOut(nil)
         }
+        return true
     }
 
     private func ensurePanel() {

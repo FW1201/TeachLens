@@ -62,22 +62,22 @@ defaults read "$PWD/.build/TeachLens (Dev).app/Contents/Info" CFBundleShortVersi
 defaults read "$PWD/.build/TeachLens (Dev).app/Contents/Info" CFBundleVersion
 ```
 
-The official Azure DevOps build supplies `TEACHLENS_VERSION` from the version
-entered when the pipeline is queued. Values must contain two or three numeric
-components, such as `1.2` or `1.2.0`; malformed values fail before compilation
-or signing begins.
+GitHub Actions supplies `TEACHLENS_VERSION` from `VERSION`, a release tag, or
+the manual workflow input. Values must contain two or three numeric components,
+such as `1.2` or `1.2.0`; malformed values fail before compilation or signing.
 
 ## Build Variants
 
-One source tree produces the standard unsandboxed application and the sandboxed
-product surface used for Mac App Store releases.
+The script supports an unsandboxed build and an experimental sandboxed build.
+The project distributes through GitHub Releases; the `appstore` flag does not
+mean that an App Store release exists.
 
 | Variant | Product surface |
 | --- | --- |
-| Homebrew | Unsandboxed, including DemoType |
-| Mac App Store | App Sandbox; DemoType is compiled out |
+| `homebrew` (script default) | Unsandboxed, including DemoType; this name is a build flag, not a published Homebrew distribution |
+| `appstore` | Experimental App Sandbox surface; DemoType is compiled out |
 
-`TEACHLENS_DISTRIBUTION` selects the channel and defaults to `homebrew`, preserving
+`TEACHLENS_DISTRIBUTION` selects the build surface and defaults to `homebrew`, preserving
 the existing local build command. `TEACHLENS_BUILD_NUMBER` independently stamps a
 numeric `CFBundleVersion` when a specific local value is needed.
 
@@ -133,10 +133,10 @@ A `.dmg` is a disk image, not an executable; use `open path/to/file.dmg` rather 
 
 ### Bundle identity: dev vs. official
 
-`Scripts/build-app.sh` picks the bundle identity from the signing identity so a locally built copy never fights the officially distributed app over macOS privacy (TCC) grants, which are keyed by bundle id **and** code-signing requirement:
+`Scripts/build-app.sh` normally picks the bundle identity from the signing identity. The GitHub release workflow explicitly overrides the name and bundle ID while using the default ad-hoc signature, so the currently published release is not Developer ID signed or notarized. Privacy (TCC) grants depend on the bundle id **and** code-signing requirement; an ad-hoc rebuild may require permissions to be granted again.
 
 - **Contributor / ad-hoc build (default):** app bundle `TeachLens (Dev).app`, bundle id `io.github.fw1201.teachlens.dev`, display name “TeachLens (Dev)”, ad-hoc signed. Both the distinct file name and bundle id keep it separate from an installed official `TeachLens.app`, so its Screen Recording grant is its own row in System Settings and the two never clobber each other.
-- **Official build:** pass a real Developer ID identity and it keeps the canonical `io.github.fw1201.teachlens` id:
+- **Optional Developer ID build:** pass a real Developer ID identity to use the canonical `io.github.fw1201.teachlens` id with that signature:
 
   ```sh
   TEACHLENS_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
