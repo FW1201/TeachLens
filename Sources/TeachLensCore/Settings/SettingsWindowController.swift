@@ -184,14 +184,19 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         window.makeKeyAndOrderFront(nil)
     }
 
-    /// Selects a pane by id in the sidebar.
+    /// Selects a pane by id: its group in the sidebar, then the pane within.
     func select(pane id: String) {
+        let groupID = Self.group(containing: id) ?? id
         guard let row = Self.sidebarRows.firstIndex(where: {
-            if case .pane(let paneID) = $0 { return paneID == id }
+            if case .pane(let paneID) = $0 { return paneID == groupID }
             return false
         }) else { return }
         sidebarTableView?.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
-        settingsTabView?.selectTabViewItem(withIdentifier: id)
+        settingsTabView?.selectTabViewItem(withIdentifier: groupID)
+        if let switcher = groupSwitchers[groupID], let index = switcher.members.firstIndex(of: id) {
+            switcher.control.selectedSegment = index
+            switcher.tabs.selectTabViewItem(withIdentifier: id)
+        }
     }
 
     func windowWillClose(_ notification: Notification) {
@@ -219,10 +224,46 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
 
     static var settingsTabTitles: [String] { teachingPaneIDs + toolPaneIDs }
 
+    /// The sidebar shows eight groups instead of seventeen panes; a group with
+    /// several panes switches between them with a segmented control on top.
+    static var paneGroups: [(id: String, members: [String])] {
+        var advanced = ["General"]
+        #if !TEACHLENS_APP_STORE
+        advanced.append("DemoType")
+        #endif
+        advanced.append("DemoMirror")
+        return [
+            ("Check", ["Check"]),
+            ("Modes", ["Modes"]),
+            ("KeysCursor", ["Keystrokes", "Spotlight"]),
+            ("Captions", ["Captions"]),
+            ("BoardTimer", ["Whiteboard", "Break"]),
+            ("ZoomDraw", ["Zoom", "Live Zoom", "Draw", "Type"]),
+            ("Capture", ["Snip", "Record", "Panorama"]),
+            ("Advanced", advanced),
+        ]
+    }
+
+    static let teachingGroupIDs: Set<String> = ["Check", "Modes", "KeysCursor", "Captions", "BoardTimer"]
+
+    static func group(containing pane: String) -> String? {
+        paneGroups.first { $0.members.contains(pane) }?.id
+    }
+
+    /// Segmented switchers of multi-pane groups, by group id.
+    private var groupSwitchers: [String: (control: NSSegmentedControl, tabs: NSTabView, members: [String])] = [:]
+
     /// The localized name shown for a pane ID.
     static func displayTitle(for id: String) -> String {
         switch id {
         case "Check": return L10n.t("Check & Test", "總覽與測試")
+        case "KeysCursor": return L10n.t("Keystrokes & Pointer", "按鍵與游標")
+        case "BoardTimer": return L10n.t("Whiteboard & Timer", "白板與計時")
+        case "ZoomDraw": return L10n.t("Zoom & Annotate", "放大與標註")
+        case "Capture": return L10n.t("Capture", "擷取")
+        case "Advanced": return L10n.t("Advanced", "進階")
+        case "DemoType": return L10n.t("Auto Typing", "自動打字")
+        case "DemoMirror": return L10n.t("Mirror Window", "鏡像視窗")
         case "Keystrokes": return L10n.t("Keystrokes", "按鍵顯示")
         case "Spotlight": return L10n.t("Spotlight", "聚光燈")
         case "Captions": return L10n.t("Captions", "字幕")
@@ -247,8 +288,71 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
     }
 
     private static var sidebarRows: [SidebarRow] {
-        [.header(L10n.t("Teaching", "教學"))] + teachingPaneIDs.map { .pane($0) }
-            + [.header(L10n.t("ZoomIt Tools", "ZoomIt 工具"))] + toolPaneIDs.map { .pane($0) }
+        let groups = paneGroups.map(\.id)
+        let teaching: [SidebarRow] = groups.filter { teachingGroupIDs.contains($0) }.map { .pane($0) }
+        let tools: [SidebarRow] = groups.filter { !teachingGroupIDs.contains($0) }.map { .pane($0) }
+        return [.header(L10n.t("Teaching", "教學"))] + teaching + [.header(L10n.t("Tools", "工具"))] + tools
+    }
+
+    /// One sidebar entry's content: the pane itself, or a segmented switcher
+    /// over the group's panes sized to the tallest of them.
+    private func makeGroupView(id: String, members: [String]) -> NSView {
+        let views = members.map { viewForTab($0) }
+        if views.count == 1 { return views[0] }
+        var tallest: CGFloat = 0
+        for view in views {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            let width = view.widthAnchor.constraint(equalToConstant: Self.contentWidth)
+            width.isActive = true
+            view.layoutSubtreeIfNeeded()
+            tallest = max(tallest, view.fittingSize.height)
+            width.isActive = false
+        }
+        let tabs = NSTabView()
+        tabs.tabViewType = .noTabsNoBorder
+        tabs.translatesAutoresizingMaskIntoConstraints = false
+        for (member, view) in zip(members, views) {
+            let holder = NSView()
+            holder.translatesAutoresizingMaskIntoConstraints = true
+            holder.autoresizingMask = [.width, .height]
+            holder.frame = NSRect(x: 0, y: 0, width: Self.contentWidth, height: tallest)
+            holder.addSubview(view)
+            NSLayoutConstraint.activate([
+                view.topAnchor.constraint(equalTo: holder.topAnchor),
+                view.leadingAnchor.constraint(equalTo: holder.leadingAnchor),
+                view.trailingAnchor.constraint(equalTo: holder.trailingAnchor)
+            ])
+            tabs.addTabViewItem(makeTabItem(label: member, view: holder))
+        }
+        NSLayoutConstraint.activate([
+            tabs.widthAnchor.constraint(equalToConstant: Self.contentWidth),
+            tabs.heightAnchor.constraint(equalToConstant: tallest + 4)
+        ])
+
+        let control = NSSegmentedControl(labels: members.map { Self.displayTitle(for: $0) },
+                                         trackingMode: .selectOne, target: self,
+                                         action: #selector(subPaneChanged(_:)))
+        for (index, member) in members.enumerated() {
+            control.setImage(NSImage(systemSymbolName: Self.paneSymbolName(for: member), accessibilityDescription: nil),
+                             forSegment: index)
+            control.setImageScaling(.scaleProportionallyDown, forSegment: index)
+        }
+        control.selectedSegment = 0
+        control.identifier = NSUserInterfaceItemIdentifier(id)
+        groupSwitchers[id] = (control, tabs, members)
+
+        let stack = NSStackView(views: [control, tabs])
+        stack.orientation = .vertical
+        stack.alignment = .centerX
+        stack.spacing = 10
+        stack.edgeInsets = NSEdgeInsets(top: 6, left: 0, bottom: 0, right: 0)
+        return stack
+    }
+
+    @objc private func subPaneChanged(_ sender: NSSegmentedControl) {
+        guard let id = sender.identifier?.rawValue, let switcher = groupSwitchers[id],
+              switcher.members.indices.contains(sender.selectedSegment) else { return }
+        switcher.tabs.selectTabViewItem(withIdentifier: switcher.members[sender.selectedSegment])
     }
 
     private func viewForTab(_ title: String) -> NSView {
@@ -294,8 +398,9 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         // share a single height. Equal-height tabs keep the tab view a constant
         // size, which in turn keeps the footer anchored near the bottom no
         // matter which tab is selected.
-        let tabs: [(String, NSView)] = Self.settingsTabTitles.map { title in
-            (title, viewForTab(title))
+        groupSwitchers = [:]
+        let tabs: [(String, NSView)] = Self.paneGroups.map { group in
+            (group.id, makeGroupView(id: group.id, members: group.members))
         }
 
         var maxContentHeight: CGFloat = 0
@@ -485,6 +590,11 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
     static func paneSymbolName(for title: String) -> String {
         switch title {
         case "General": return "gearshape"
+        case "KeysCursor": return "command"
+        case "BoardTimer": return "scribble"
+        case "ZoomDraw": return "plus.magnifyingglass"
+        case "Capture": return "camera.viewfinder"
+        case "Advanced": return "gearshape.2"
         case "Keystrokes": return "command"
         case "Spotlight": return "light.max"
         case "Check": return "checklist"

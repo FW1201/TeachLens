@@ -23,6 +23,21 @@ enum TeachingSelfTests {
         try testWhiteboardScreenshotScaling()
         try testWhiteboardUndoSkipsNoOps()
         try testWhiteboardShapesAndPages()
+        try testSettingsGroups()
+    }
+
+    private static func testSettingsGroups() throws {
+        let groups = SettingsWindowController.paneGroups
+        try expect(groups.count <= 8, "Settings should show at most eight groups, got \(groups.count)")
+        let members = groups.flatMap(\.members)
+        try expect(Set(members) == Set(SettingsWindowController.settingsTabTitles) && members.count == Set(members).count,
+                   "Every settings pane should belong to exactly one group")
+        for group in groups {
+            let symbol = SettingsWindowController.paneSymbolName(for: group.id)
+            try expect(NSImage(systemSymbolName: symbol, accessibilityDescription: nil) != nil,
+                       "Group \(group.id) needs a resolvable SF Symbol, got \(symbol)")
+        }
+        try expect(groups.first?.id == "Check", "Check & Test should stay first")
     }
 
     private static func testWhiteboardShapesAndPages() throws {
