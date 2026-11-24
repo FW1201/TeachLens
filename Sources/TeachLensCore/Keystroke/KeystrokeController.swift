@@ -271,7 +271,8 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
             return cachedRecordingFrame
         }
         let s = CGFloat(min(max(settings.scale, 0.5), 3))
-        let view = KeystrokeStackView(groups: model.groups, position: settings.position, scale: s, glass: .solid)
+        let view = KeystrokeStackView(groups: model.groups, position: settings.position, scale: s, glass: .solid,
+                                      showWindows: settings.windowsEquivalent)
             .padding(16 * s)
         let renderer = ImageRenderer(content: view)
         renderer.scale = panel.backingScaleFactor
@@ -308,6 +309,7 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
         add("Show Mouse Clicks", #selector(toggleMouseEvents))
         add("Click Ripples", #selector(toggleClickRipples))
         add("Keep History", #selector(toggleHistory))
+        add(L10n.t("Windows Equivalents", "Windows 對照"), #selector(toggleWindowsEquivalent))
         menu.addItem(.separator())
         for position in KeystrokePosition.allCases {
             add(position.title, #selector(setPosition(_:)), position.rawValue)
@@ -332,6 +334,10 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
 
     @objc private func toggleClickRipples() {
         update { $0.showClickRipples.toggle() }
+    }
+
+    @objc func toggleWindowsEquivalent() {
+        update { $0.windowsEquivalent.toggle() }
     }
 
     @objc private func toggleHistory() {
@@ -371,6 +377,8 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
             menuItem.state = settings.showClickRipples ? .on : .off
         case #selector(toggleHistory):
             menuItem.state = settings.showHistory ? .on : .off
+        case #selector(toggleWindowsEquivalent):
+            menuItem.state = settings.windowsEquivalent ? .on : .off
         case #selector(setPosition(_:)):
             menuItem.state = raw == settings.position.rawValue ? .on : .off
         case #selector(setGlass(_:)):

@@ -54,6 +54,8 @@ struct KeystrokeSettings: Codable, Equatable, Sendable {
     var scale: Double = 1.0
     /// Distance from the screen edge, in points.
     var margin: Double = 64
+    /// Show the Windows equivalent under each combination ("Windows 對照").
+    var windowsEquivalent = false
     /// Global toggle hotkey: virtual key code and NSEvent modifier raw value.
     /// Defaults to Control+0 (ZoomIt uses Control+1 … Control+9).
     var toggleKeyCode = 29
@@ -76,6 +78,7 @@ struct KeystrokeSettings: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case enabled, filter, allowedKeys, showHistory, maxHistory, showMouseEvents, showClickRipples
         case lingerSeconds, dragThreshold, position, glass, scale, margin, toggleKeyCode, toggleModifiers
+        case windowsEquivalent
     }
 
     init(from decoder: Decoder) throws {
@@ -94,6 +97,7 @@ struct KeystrokeSettings: Codable, Equatable, Sendable {
         glass = (try? c.decodeIfPresent(KeystrokeGlass.self, forKey: .glass)) ?? d.glass
         scale = try c.decodeIfPresent(Double.self, forKey: .scale) ?? d.scale
         margin = try c.decodeIfPresent(Double.self, forKey: .margin) ?? d.margin
+        windowsEquivalent = try c.decodeIfPresent(Bool.self, forKey: .windowsEquivalent) ?? d.windowsEquivalent
         toggleKeyCode = try c.decodeIfPresent(Int.self, forKey: .toggleKeyCode) ?? d.toggleKeyCode
         toggleModifiers = try c.decodeIfPresent(UInt.self, forKey: .toggleModifiers) ?? d.toggleModifiers
     }

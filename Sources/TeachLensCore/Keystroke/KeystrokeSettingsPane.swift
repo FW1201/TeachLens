@@ -24,6 +24,7 @@ struct KeystrokeSettingsPane: View {
                 }
                 Toggle("Include mouse clicks in shortcuts", isOn: $draft.showMouseEvents)
                 Toggle("Click ripples at the pointer", isOn: $draft.showClickRipples)
+                Toggle(L10n.t("Show Windows equivalents (Windows 對照)", "開啟 Windows 對照"), isOn: $draft.windowsEquivalent)
                 Toggle("Keep recent shortcuts", isOn: $draft.showHistory)
                 if draft.showHistory {
                     Stepper("Recent shortcuts: \(draft.maxHistory)", value: $draft.maxHistory, in: 2...6)

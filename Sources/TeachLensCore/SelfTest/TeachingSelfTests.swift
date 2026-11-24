@@ -9,6 +9,30 @@ enum TeachingSelfTests {
         try testSpotlightSettingsDecode()
         try testCourseModeBuiltIns()
         try testCourseModeImportExport()
+        try testWindowsEquivalents()
+    }
+
+    private static func testWindowsEquivalents() throws {
+        func w(_ names: [String]) -> String? { WindowsEquivalent.text(for: names) }
+        let cmd = KeyName.metaLeft, shift = KeyName.shiftLeft, opt = KeyName.alt, ctrl = KeyName.controlLeft
+        let cases: [([String], String?)] = [
+            ([cmd, "KeyC"], "Ctrl + C"),
+            ([cmd, shift, "KeyZ"], "Ctrl + Y"),
+            ([shift, cmd, "KeyS"], "Ctrl + Shift + S"),
+            ([cmd, "KeyQ"], "Alt + F4"),
+            ([cmd, "Tab"], "Alt + Tab"),
+            ([opt, cmd, "Escape"], "Ctrl + Alt + Delete"),
+            ([cmd, shift, "Num4"], "⊞ Win + Shift + S"),
+            ([cmd, "LeftArrow"], "Home"),
+            ([opt, "LeftArrow"], "Ctrl + ←"),
+            ([opt, "KeyE"], "Alt + E"),
+            ([ctrl, KeyName.mouseLeft], "Right-click"),
+            (["Return"], "Enter"),
+            (["KeyA"], nil),
+        ]
+        for (names, expected) in cases {
+            try expect(w(names) == expected, "Windows equivalent of \(names) should be \(expected ?? "nil"), got \(w(names) ?? "nil")")
+        }
     }
 
     private static func testCourseModeBuiltIns() throws {

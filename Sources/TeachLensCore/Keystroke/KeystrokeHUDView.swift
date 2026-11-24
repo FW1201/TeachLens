@@ -17,6 +17,8 @@ struct KeystrokeDisplayGroup: Identifiable, Equatable {
     var modifierGlyphs: String
     var chips: [KeystrokeChip]
     var count: Int
+    /// The Windows equivalent ("Windows 對照"), when it differs meaningfully.
+    var windowsText: String?
 
     static func make(from group: KeystrokeGroup, index: Int) -> KeystrokeDisplayGroup {
         let ordered = KeyName.displayOrder(group.keys.map(\.name))
@@ -51,7 +53,8 @@ struct KeystrokeDisplayGroup: Identifiable, Equatable {
             id: "\(index)-\(group.createdAt)",
             modifierGlyphs: glyphs,
             chips: chips,
-            count: lastCount
+            count: lastCount,
+            windowsText: WindowsEquivalent.text(for: group.keys.map(\.name))
         )
     }
 }
@@ -84,7 +87,8 @@ struct KeystrokeHUDView: View {
             ZStack(alignment: Self.frameAlignment(settings.position)) {
                 Color.clear
                 KeystrokeGlassContainer(glass: settings.glass, spacing: 8 * s) {
-                    KeystrokeStackView(groups: model.groups, position: settings.position, scale: s, glass: settings.glass)
+                    KeystrokeStackView(groups: model.groups, position: settings.position, scale: s, glass: settings.glass,
+                                       showWindows: settings.windowsEquivalent)
                 }
                 .padding(CGFloat(settings.margin))
             }
@@ -136,12 +140,14 @@ struct KeystrokeStackView: View {
     let position: KeystrokePosition
     let scale: CGFloat
     let glass: KeystrokeGlass
+    var showWindows = false
 
     var body: some View {
         VStack(alignment: KeystrokeHUDView.stackAlignment(position), spacing: 8 * scale) {
             ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
                 let isOld = index < groups.count - 1
-                KeystrokePillView(group: group, scale: scale, glass: glass)
+                KeystrokeComboView(group: group, scale: scale, glass: glass, showWindows: showWindows,
+                                   alignment: KeystrokeHUDView.stackAlignment(position))
                     .opacity(isOld ? 0.55 : 1)
                     .scaleEffect(isOld ? 0.86 : 1, anchor: KeystrokeHUDView.scaleAnchor(position))
                     .transition(.scale(scale: 0.85).combined(with: .opacity))
@@ -155,6 +161,39 @@ struct KeystrokeStackView: View {
 struct KeystrokeRecordingFrame: @unchecked Sendable {
     let image: CGImage
     let frame: CGRect
+}
+
+/// A pill plus, when "Windows 對照" is on, the Windows equivalent under it.
+struct KeystrokeComboView: View {
+    let group: KeystrokeDisplayGroup
+    let scale: CGFloat
+    let glass: KeystrokeGlass
+    let showWindows: Bool
+    let alignment: HorizontalAlignment
+
+    var body: some View {
+        let s = scale
+        VStack(alignment: alignment, spacing: 5 * s) {
+            KeystrokePillView(group: group, scale: s, glass: glass)
+            if showWindows, let windows = group.windowsText {
+                HStack(spacing: 6 * s) {
+                    Image(systemName: "pc")
+                        .font(.system(size: 12 * s, weight: .semibold))
+                    Text("Windows")
+                        .font(.system(size: 11 * s, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.7))
+                    Text(windows)
+                        .font(.system(size: 15 * s, weight: .semibold, design: .rounded))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12 * s)
+                .padding(.vertical, 6 * s)
+                .background(Capsule().fill(Color(red: 0.0, green: 0.36, blue: 0.75).opacity(0.88)))
+                .overlay(Capsule().strokeBorder(Color.white.opacity(0.25), lineWidth: 1))
+                .fixedSize()
+            }
+        }
+    }
 }
 
 struct KeystrokePillView: View {
