@@ -19,6 +19,8 @@ enum KeystrokeSelfTests {
         try testSoloModifierWaitsBeforeShowing()
         try testCombinationExpiresAsAWhole()
         try testReleasedKeyLeavesCombination()
+        try testWindowsFirstPill()
+        try testMeetingBarAndCaptionClearance()
         try testModifierClickAndDrag()
         try testScrollReleasesAfterLinger()
         try testSettingsRoundTripAndDefaults()
@@ -183,6 +185,48 @@ enum KeystrokeSelfTests {
         try expect(!e.groups.isEmpty, "The combination should linger after release")
         e.tick(at: 6.5)
         try expect(e.groups.isEmpty, "The combination should leave together")
+    }
+
+    private static func testMeetingBarAndCaptionClearance() throws {
+        var settings = KeystrokeSettings()
+        settings.position = .bottomCenter
+        try expect(settings.avoidMeetingBar && settings.meetingInset == KeystrokeSettings.meetingBarHeight,
+                   "Bottom pills should keep clear of the meeting bar by default")
+        settings.position = .topCenter
+        try expect(settings.meetingInset == 0, "Top pills need no meeting-bar room")
+        settings.position = .bottomCenter
+        let plain = settings.occupiedHeight
+        settings.windowsEquivalent = true
+        try expect(settings.occupiedHeight > plain, "The Windows line should take more room")
+        settings.enabled = false
+        try expect(settings.occupiedHeight == 0, "Hidden keystrokes take no room")
+        try expect(KeystrokeSizePreset(rawValue: KeystrokeSettings().scale) == .normal,
+                   "The default size should be the Standard preset")
+        try expect(WindowsEquivalent.cheatSheet.count >= 20, "The handout should list the common shortcuts")
+    }
+
+    private static func testWindowsFirstPill() throws {
+        func display(_ names: [String]) -> KeystrokeDisplayGroup {
+            var e = engine { $0.filter = .none }
+            for (i, name) in names.enumerated() { e.keyDown(name, at: Double(i) * 0.01) }
+            return KeystrokeDisplayGroup.make(from: e.groups.last!, index: 0)
+        }
+        let copy = display([KeyName.metaLeft, "KeyC"])
+        guard let win = copy.windowsPrimary() else { throw SelfTestError.failure("Keystroke: ⌘C should have a Windows pill") }
+        try expect(win.modifierGlyphs == "Ctrl" && win.chips.map(\.text) == ["C"] && win.modifiersAreWords,
+                   "⌘C should read Ctrl + C, got \(win.modifierGlyphs) \(win.chips.map(\.text))")
+        try expect(copy.macText == "⌘C", "The Mac line for ⌘C should be ⌘C, got \(copy.macText)")
+
+        let snip = display([KeyName.shiftLeft, KeyName.metaLeft, "Num4"])
+        let snipWin = snip.windowsPrimary()
+        try expect(snipWin?.modifierGlyphs == "⊞ Win + Shift" && snipWin?.chips.map(\.text) == ["S"],
+                   "⇧⌘4 should read ⊞ Win + Shift + S, got \(String(describing: snipWin?.modifierGlyphs))")
+        try expect(snip.macText == "⇧⌘4", "The Mac line for ⇧⌘4 should be ⇧⌘4, got \(snip.macText)")
+
+        try expect(display(["KeyA"]).windowsPrimary() == nil, "A plain letter is the same on both systems")
+
+        let decoded = try JSONDecoder().decode(KeystrokeSettings.self, from: Data("{}".utf8))
+        try expect(decoded.primaryPlatform == .mac, "Existing settings should stay Mac first")
     }
 
     private static func testReleasedKeyLeavesCombination() throws {

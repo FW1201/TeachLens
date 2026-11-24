@@ -22,13 +22,23 @@ struct CheckAndTestPane: View {
                 LabeledContent(L10n.t("Build", "類型"), value: AppInfo.isDevBuild
                                ? L10n.t("Development (separate permissions)", "開發版（權限與正式版分開）")
                                : L10n.t("Release", "正式版"))
-                Button(copied ? L10n.t("Copied", "已複製") : L10n.t("Copy diagnostics", "複製診斷資訊")) {
-                    let text = center.diagnostics(keystrokes: controllers.keystrokes,
-                                                  spotlight: controllers.spotlight,
-                                                  captions: controllers.captions)
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(text, forType: .string)
-                    copied = true
+                HStack {
+                    Button {
+                        let text = center.diagnostics(keystrokes: controllers.keystrokes,
+                                                      spotlight: controllers.spotlight,
+                                                      captions: controllers.captions)
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(text, forType: .string)
+                        copied = true
+                    } label: {
+                        Label(copied ? L10n.t("Copied", "已複製") : L10n.t("Copy diagnostics", "複製診斷資訊"),
+                              systemImage: copied ? "checkmark" : "doc.on.doc")
+                    }
+                    Button {
+                        OnboardingController.shared?.show()
+                    } label: {
+                        Label(L10n.t("Open the welcome guide", "重新開啟新手引導"), systemImage: "sparkles")
+                    }
                 }
             }
 

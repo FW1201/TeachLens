@@ -75,6 +75,8 @@ final class ModeCoordinator {
     var onToggleSpotlight: (() -> Void)?
     var onToggleCaptions: (() -> Void)?
     var onToggleWhiteboard: (() -> Void)?
+    var onToggleHideOverlays: (() -> Void)?
+    var onToggleCountdown: (() -> Void)?
     /// Extra TeachLens windows (the keystroke HUD) to keep out of the zoom
     /// source capture, so they are not frozen into or magnified by zoom.
     var additionalCaptureExclusions: (() -> [Int])?
@@ -170,6 +172,10 @@ final class ModeCoordinator {
             onToggleCaptions?()
         case .toggleWhiteboard:
             onToggleWhiteboard?()
+        case .toggleHideOverlays:
+            onToggleHideOverlays?()
+        case .toggleCountdown:
+            onToggleCountdown?()
         case .toggleDemoMirror(let scope):
             demoMirrorController.toggle(scope: scope)
         case .setTool(let tool):

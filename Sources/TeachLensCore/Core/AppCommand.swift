@@ -27,6 +27,10 @@ enum AppCommand: Equatable {
     case toggleSpotlight
     case toggleCaptions
     case toggleWhiteboard
+    /// Hide (or bring back) everything students can see.
+    case toggleHideOverlays
+    /// Start or stop the classroom countdown in the corner.
+    case toggleCountdown
     case toggleDemoMirror(scope: DemoMirrorScope)
     case exit
 }

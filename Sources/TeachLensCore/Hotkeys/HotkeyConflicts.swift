@@ -15,6 +15,16 @@ enum HotkeyConflicts {
     static let whiteboardKeyCode = kVK_ANSI_W
     static let whiteboardModifiers: UInt = NSEvent.ModifierFlags.control.rawValue | NSEvent.ModifierFlags.shift.rawValue
 
+    /// Hide everything students can see (keystrokes, captions, spotlight):
+    /// Control+Option+Command+H. Press again to bring it back.
+    static let hideOverlaysKeyCode = kVK_ANSI_H
+    static let hideOverlaysModifiers: UInt = NSEvent.ModifierFlags.control.rawValue
+        | NSEvent.ModifierFlags.option.rawValue | NSEvent.ModifierFlags.command.rawValue
+
+    /// Classroom countdown in the corner: Control+Shift+T.
+    static let countdownKeyCode = kVK_ANSI_T
+    static let countdownModifiers: UInt = NSEvent.ModifierFlags.control.rawValue | NSEvent.ModifierFlags.shift.rawValue
+
     static let relevantModifiers: NSEvent.ModifierFlags = [.command, .option, .control, .shift]
 
     static func normalized(_ modifiers: UInt) -> UInt {
@@ -51,6 +61,8 @@ enum HotkeyConflicts {
         let captions = CaptionSettingsStore().load()
         list.append(Shortcut(name: "Live Captions", keyCode: captions.toggleKeyCode, modifiers: captions.toggleModifiers))
         list.append(Shortcut(name: "Whiteboard", keyCode: whiteboardKeyCode, modifiers: whiteboardModifiers))
+        list.append(Shortcut(name: "Hide Overlays", keyCode: hideOverlaysKeyCode, modifiers: hideOverlaysModifiers))
+        list.append(Shortcut(name: "Class Countdown", keyCode: countdownKeyCode, modifiers: countdownModifiers))
         // A key code of 0 disables a shortcut.
         return list.filter { $0.keyCode != 0 }
     }

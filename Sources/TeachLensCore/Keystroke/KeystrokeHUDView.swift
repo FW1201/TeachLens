@@ -19,6 +19,34 @@ struct KeystrokeDisplayGroup: Identifiable, Equatable {
     var count: Int
     /// The Windows equivalent ("Windows 對照"), when it differs meaningfully.
     var windowsText: String?
+    /// True when `modifierGlyphs` holds words ("Ctrl + Shift") rather than
+    /// Mac glyphs, so the pill uses a smaller, unspaced font.
+    var modifiersAreWords = false
+
+    /// The Mac combination as one line, written the way macOS menus do:
+    /// "⇧⌘4", "⌘Click".
+    var macText: String {
+        modifierGlyphs + chips.map(\.text).joined(separator: " ")
+    }
+
+    static let windowsModifierWords: Set<String> = ["Ctrl", "Alt", "Shift", "Fn", "⊞ Win"]
+
+    /// The same combination with the Windows shortcut in the pill, for
+    /// "Windows first". Nil when the two systems type it the same way (plain
+    /// letters, digits), so those keep the normal pill.
+    func windowsPrimary() -> KeystrokeDisplayGroup? {
+        guard let windowsText else { return nil }
+        let parts = windowsText.components(separatedBy: " + ")
+        let modifiers = parts.filter { Self.windowsModifierWords.contains($0) }
+        let keys = parts.filter { !Self.windowsModifierWords.contains($0) }
+        var converted = self
+        converted.modifierGlyphs = modifiers.joined(separator: " + ")
+        converted.modifiersAreWords = true
+        converted.chips = keys.enumerated().map { index, key in
+            KeystrokeChip(id: "win-\(index)-\(key)", text: key, sfSymbol: nil, isWord: key.count > 2)
+        }
+        return converted
+    }
 
     static func make(from group: KeystrokeGroup, index: Int) -> KeystrokeDisplayGroup {
         let ordered = KeyName.displayOrder(group.keys.map(\.name))
@@ -89,9 +117,10 @@ struct KeystrokeHUDView: View {
                 Color.clear
                 KeystrokeGlassContainer(glass: settings.glass, spacing: 8 * s) {
                     KeystrokeStackView(groups: model.groups, position: settings.position, scale: s, glass: settings.glass,
-                                       showWindows: settings.windowsEquivalent)
+                                       showWindows: settings.windowsEquivalent, primary: settings.primaryPlatform)
                 }
                 .padding(CGFloat(settings.margin))
+                .padding(.bottom, CGFloat(settings.meetingInset))
             }
             ZStack(alignment: .topLeading) {
                 Color.clear
@@ -143,6 +172,7 @@ struct KeystrokeStackView: View {
     let scale: CGFloat
     let glass: KeystrokeGlass
     var showWindows = false
+    var primary: KeystrokePlatform = .mac
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Pills pop in from their anchor and fade out, so a combination leaving
@@ -161,7 +191,7 @@ struct KeystrokeStackView: View {
             ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
                 let isOld = index < groups.count - 1
                 KeystrokeComboView(group: group, scale: scale, glass: glass, showWindows: showWindows,
-                                   alignment: KeystrokeHUDView.stackAlignment(position))
+                                   alignment: KeystrokeHUDView.stackAlignment(position), primary: primary)
                     .opacity(isOld ? 0.55 : 1)
                     .scaleEffect(isOld ? 0.86 : 1, anchor: KeystrokeHUDView.scaleAnchor(position))
                     .transition(transition)
@@ -177,19 +207,38 @@ struct KeystrokeRecordingFrame: @unchecked Sendable {
     let frame: CGRect
 }
 
-/// A pill plus, when "Windows 對照" is on, the Windows equivalent under it.
+/// A pill plus, when "Windows 對照" is on, the other system's shortcut under
+/// it: Windows below a Mac pill, or Mac below a Windows pill.
 struct KeystrokeComboView: View {
     let group: KeystrokeDisplayGroup
     let scale: CGFloat
     let glass: KeystrokeGlass
     let showWindows: Bool
     let alignment: HorizontalAlignment
+    var primary: KeystrokePlatform = .mac
 
     var body: some View {
         let s = scale
+        let windowsFirst = primary == .windows ? group.windowsPrimary() : nil
         VStack(alignment: alignment, spacing: 5 * s) {
-            KeystrokePillView(group: group, scale: s, glass: glass)
-            if showWindows, let windows = group.windowsText {
+            KeystrokePillView(group: windowsFirst ?? group, scale: s, glass: glass)
+            if showWindows, windowsFirst != nil {
+                HStack(spacing: 6 * s) {
+                    Image(systemName: "laptopcomputer")
+                        .font(.system(size: 12 * s, weight: .semibold))
+                    Text(L10n.t("Mac", "Mac"))
+                        .font(.system(size: 11 * s, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.7))
+                    Text(group.macText)
+                        .font(.system(size: 15 * s, weight: .semibold, design: .rounded))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12 * s)
+                .padding(.vertical, 6 * s)
+                .background(Capsule().fill(Color(white: 0.16).opacity(0.9)))
+                .overlay(Capsule().strokeBorder(Color.white.opacity(0.25), lineWidth: 1))
+                .fixedSize()
+            } else if showWindows, windowsFirst == nil, primary == .mac, let windows = group.windowsText {
                 HStack(spacing: 6 * s) {
                     Image(systemName: "pc")
                         .font(.system(size: 12 * s, weight: .semibold))
@@ -218,10 +267,18 @@ struct KeystrokePillView: View {
     var body: some View {
         let s = scale
         HStack(spacing: 6 * s) {
+            if group.modifiersAreWords {
+                // A small Windows mark so students see at a glance which system it is.
+                Image(systemName: "squareshape.split.2x2")
+                    .font(.system(size: 15 * s, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .padding(.leading, 6 * s)
+                    .accessibilityLabel("Windows")
+            }
             if !group.modifierGlyphs.isEmpty {
                 Text(group.modifierGlyphs)
-                    .font(.system(size: 21 * s, weight: .semibold, design: .rounded))
-                    .kerning(2 * s)
+                    .font(.system(size: (group.modifiersAreWords ? 17 : 21) * s, weight: .semibold, design: .rounded))
+                    .kerning((group.modifiersAreWords ? 0 : 2) * s)
                     .foregroundStyle(.white)
                     .padding(.horizontal, 14 * s)
                     .frame(minWidth: 46 * s, minHeight: 46 * s)

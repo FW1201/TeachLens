@@ -3,13 +3,25 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 enum WhiteboardTool: String, CaseIterable, Sendable {
-    case pen, highlighter, eraser
+    case pen, highlighter, laser, eraser
+    case line, arrow, rectangle, text
+
+    /// The drawing tools on the bar; shapes and text sit in one menu.
+    static let barTools: [WhiteboardTool] = [.pen, .highlighter, .laser]
+    static let shapeTools: [WhiteboardTool] = [.line, .arrow, .rectangle, .text]
+
+    var isShape: Bool { Self.shapeTools.contains(self) }
 
     var title: String {
         switch self {
         case .pen: return L10n.t("Pen", "畫筆")
         case .highlighter: return L10n.t("Highlighter", "螢光筆")
+        case .laser: return L10n.t("Laser Pointer", "雷射筆")
         case .eraser: return L10n.t("Eraser", "橡皮擦")
+        case .line: return L10n.t("Line", "直線")
+        case .arrow: return L10n.t("Arrow", "箭頭")
+        case .rectangle: return L10n.t("Box", "方框")
+        case .text: return L10n.t("Text", "文字")
         }
     }
 
@@ -17,15 +29,34 @@ enum WhiteboardTool: String, CaseIterable, Sendable {
         switch self {
         case .pen: return "pencil.tip"
         case .highlighter: return "highlighter"
+        case .laser: return "wand.and.rays"
         case .eraser: return "eraser"
+        case .line: return "line.diagonal"
+        case .arrow: return "arrow.up.right"
+        case .rectangle: return "rectangle"
+        case .text: return "textformat"
         }
     }
 
-    var key: String {
+    var key: String? {
         switch self {
         case .pen: return "P"
         case .highlighter: return "H"
+        case .laser: return "L"
         case .eraser: return "E"
+        case .arrow: return "A"
+        case .text: return "T"
+        default: return nil
+        }
+    }
+
+    var strokeKind: WhiteboardStrokeKind {
+        switch self {
+        case .line: return .line
+        case .arrow: return .arrow
+        case .rectangle: return .rectangle
+        case .text: return .text
+        default: return .free
         }
     }
 }
@@ -72,13 +103,23 @@ final class WhiteboardModel: ObservableObject {
 /// rendered once into a bitmap at the view's pixel size and reused, so a drag
 /// only draws that bitmap plus the stroke in progress instead of decoding the
 /// screenshot and re-stroking every line on every mouse event.
-final class WhiteboardCanvasView: NSView {
+final class WhiteboardCanvasView: NSView, NSTextFieldDelegate {
     var model: WhiteboardModel?
     var onChange: (() -> Void)?
     private var activeStroke: WhiteboardStroke?
     private var cachedPage: WhiteboardPage?
     private var cachedPixelSize: CGSize = .zero
     private var cachedImage: CGImage?
+
+    /// Laser trails: points with the time they were drawn. They fade and are
+    /// never saved.
+    private var laserTrails: [[(point: CGPoint, time: TimeInterval)]] = []
+    private var laserTimer: Timer?
+    static let laserLife: TimeInterval = 1.2
+
+    /// The text box being typed into, and where (canvas coordinates).
+    private var textField: NSTextField?
+    private var textOrigin: CGPoint = .zero
 
     /// Room kept around the page for the floating toolbars.
     static let insets = NSEdgeInsets(top: 66, left: 28, bottom: 62, right: 28)
@@ -99,11 +140,18 @@ final class WhiteboardCanvasView: NSView {
         return WhiteboardRenderer.aspectFit(WhiteboardDocument.canvasSize, in: area).integral
     }
 
+    private var canvasScale: CGFloat { pageRect.width / WhiteboardDocument.canvasSize.width }
+
     private func canvasPoint(_ event: NSEvent) -> CGPoint {
         let p = convert(event.locationInWindow, from: nil)
         let rect = pageRect
         let scale = WhiteboardDocument.canvasSize.width / rect.width
         return CGPoint(x: (p.x - rect.minX) * scale, y: (p.y - rect.minY) * scale)
+    }
+
+    private func viewPoint(_ canvas: CGPoint) -> CGPoint {
+        let rect = pageRect
+        return CGPoint(x: rect.minX + canvas.x * canvasScale, y: rect.minY + canvas.y * canvasScale)
     }
 
     override func viewDidChangeBackingProperties() {
@@ -156,30 +204,143 @@ final class WhiteboardCanvasView: NSView {
             context.draw(image, in: CGRect(origin: .zero, size: rect.size))
             context.restoreGState()
         }
+        context.translateBy(x: rect.minX, y: rect.minY)
+        context.scaleBy(x: canvasScale, y: canvasScale)
+        context.setLineCap(.round)
+        context.setLineJoin(.round)
         if let activeStroke {
-            context.translateBy(x: rect.minX, y: rect.minY)
-            let scale = rect.width / WhiteboardDocument.canvasSize.width
-            context.scaleBy(x: scale, y: scale)
-            context.setLineCap(.round)
-            context.setLineJoin(.round)
             WhiteboardRenderer.stroke(activeStroke, in: context)
         }
+        drawLaser(in: context)
         context.restoreGState()
     }
 
+    // MARK: Laser
+
+    private func drawLaser(in context: CGContext) {
+        guard !laserTrails.isEmpty else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        for trail in laserTrails {
+            for (a, b) in zip(trail, trail.dropFirst()) {
+                let age = now - b.time
+                guard age < Self.laserLife else { continue }
+                let alpha = CGFloat(1 - age / Self.laserLife)
+                context.setStrokeColor(CGColor(red: 1, green: 0.15, blue: 0.2, alpha: alpha * 0.35))
+                context.setLineWidth(16)
+                context.strokeLineSegments(between: [a.point, b.point])
+                context.setStrokeColor(CGColor(red: 1, green: 0.15, blue: 0.2, alpha: alpha))
+                context.setLineWidth(6)
+                context.strokeLineSegments(between: [a.point, b.point])
+            }
+        }
+    }
+
+    private func startLaserTimer() {
+        guard laserTimer == nil else { return }
+        let timer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.laserTick() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        laserTimer = timer
+    }
+
+    private func laserTick() {
+        let now = ProcessInfo.processInfo.systemUptime
+        laserTrails = laserTrails
+            .map { trail in trail.filter { now - $0.time < Self.laserLife } }
+            .filter { !$0.isEmpty }
+        needsDisplay = true
+        if laserTrails.isEmpty {
+            laserTimer?.invalidate()
+            laserTimer = nil
+        }
+    }
+
+    // MARK: Text
+
+    private func beginText(at canvas: CGPoint) {
+        commitText()
+        guard let model else { return }
+        textOrigin = canvas
+        let probe = WhiteboardStroke(points: [canvas], color: model.color, width: model.width, isHighlighter: false,
+                                     kind: .text, text: "")
+        let fontSize = probe.fontSize * canvasScale
+        let origin = viewPoint(canvas)
+        let field = NSTextField(frame: NSRect(x: origin.x - 4, y: origin.y - 2, width: 320, height: fontSize * 1.5))
+        field.font = .systemFont(ofSize: fontSize, weight: .semibold)
+        field.textColor = NSColor(cgColor: model.color.cgColor) ?? .black
+        field.isBordered = false
+        field.drawsBackground = true
+        field.backgroundColor = NSColor.white.withAlphaComponent(0.85)
+        field.focusRingType = .exterior
+        field.placeholderString = L10n.t("Type, then press Return", "輸入文字後按 Return")
+        field.delegate = self
+        addSubview(field)
+        window?.makeFirstResponder(field)
+        textField = field
+    }
+
+    /// Adds the typed text to the page (empty text adds nothing).
+    private func commitText() {
+        guard let field = textField else { return }
+        textField = nil
+        let text = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        field.removeFromSuperview()
+        guard let model, !text.isEmpty else { return }
+        model.checkpoint()
+        model.document.currentPage.strokes.append(
+            WhiteboardStroke(points: [textOrigin], color: model.color, width: model.width, isHighlighter: false,
+                             kind: .text, text: text))
+        needsDisplay = true
+        onChange?()
+        window?.makeFirstResponder(self)
+    }
+
+    func controlTextDidEndEditing(_ obj: Notification) {
+        commitText()
+    }
+
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        if selector == #selector(NSResponder.cancelOperation(_:)) {
+            textField?.stringValue = ""
+            commitText()
+            return true
+        }
+        return false
+    }
+
+    // MARK: Mouse
+
     override func mouseDown(with event: NSEvent) {
         guard let model else { return }
+        commitText()
         window?.makeFirstResponder(self)
         let point = canvasPoint(event)
+        switch model.tool {
+        case .laser:
+            laserTrails.append([(point, ProcessInfo.processInfo.systemUptime)])
+            startLaserTimer()
+            return
+        case .text:
+            beginText(at: point)
+            return
+        default:
+            break
+        }
         model.checkpoint()
         switch model.tool {
         case .eraser:
             model.document.erase(at: point, radius: Self.eraserRadius)
+        case .line, .arrow, .rectangle:
+            activeStroke = WhiteboardStroke(points: [point, point], color: model.color, width: model.width,
+                                            isHighlighter: false, kind: model.tool.strokeKind)
         case .pen, .highlighter:
             let highlighter = model.tool == .highlighter
             activeStroke = WhiteboardStroke(points: [point], color: model.color,
                                             width: highlighter ? max(16, model.width * 4) : model.width,
                                             isHighlighter: highlighter)
+        case .laser, .text:
+            break
         }
         needsDisplay = true
     }
@@ -187,10 +348,21 @@ final class WhiteboardCanvasView: NSView {
     override func mouseDragged(with event: NSEvent) {
         guard let model else { return }
         let point = canvasPoint(event)
-        if model.tool == .eraser {
+        switch model.tool {
+        case .eraser:
             model.document.erase(at: point, radius: Self.eraserRadius)
             needsDisplay = true
-        } else if var stroke = activeStroke {
+        case .laser:
+            guard !laserTrails.isEmpty else { return }
+            laserTrails[laserTrails.count - 1].append((point, ProcessInfo.processInfo.systemUptime))
+            needsDisplay = true
+        case .line, .arrow, .rectangle:
+            guard var stroke = activeStroke else { return }
+            stroke.points[stroke.points.count - 1] = point
+            activeStroke = stroke
+            needsDisplay = true
+        case .pen, .highlighter:
+            guard var stroke = activeStroke else { return }
             // Skip sub-pixel moves: high-rate trackpads send many, and every
             // point costs memory, save time and drawing time later.
             if let last = stroke.points.last,
@@ -198,13 +370,21 @@ final class WhiteboardCanvasView: NSView {
             stroke.points.append(point)
             activeStroke = stroke
             needsDisplay = true
+        case .text:
+            break
         }
     }
 
     override func mouseUp(with event: NSEvent) {
-        guard let model else { return }
+        guard let model, model.tool != .laser, model.tool != .text else { return }
         if let stroke = activeStroke {
-            model.document.currentPage.strokes.append(stroke)
+            let first = stroke.points.first ?? .zero, last = stroke.points.last ?? .zero
+            // A shape needs a real drag; a click without one adds nothing.
+            if stroke.kind == .free || hypot(last.x - first.x, last.y - first.y) > 3 {
+                model.document.currentPage.strokes.append(stroke)
+            } else {
+                model.discardCheckpointIfUnchanged()
+            }
             activeStroke = nil
         } else {
             model.discardCheckpointIfUnchanged()
@@ -223,7 +403,10 @@ final class WhiteboardCanvasView: NSView {
             model.undo()
         case 35: model.tool = .pen                 // P
         case 4: model.tool = .highlighter          // H
+        case 37: model.tool = .laser               // L
         case 14: model.tool = .eraser              // E
+        case 0: model.tool = .arrow                // A
+        case 17: model.tool = .text                // T
         default:
             super.keyDown(with: event)
             return
@@ -258,6 +441,9 @@ struct WhiteboardView: View {
     let onInsertScreenshot: () -> Void
     let onExportPDF: () -> Void
     let onExportPNG: () -> Void
+    let onToggleFullScreen: () -> Void
+
+    @State private var showingPages = false
 
     var body: some View {
         ZStack {
@@ -275,16 +461,45 @@ struct WhiteboardView: View {
 
     // MARK: Tool bar
 
+    private func toolHelp(_ tool: WhiteboardTool) -> String {
+        tool.key.map { "\(tool.title)（\($0)）" } ?? tool.title
+    }
+
+    private func toolButton(_ tool: WhiteboardTool, index: Int) -> some View {
+        Button { model.tool = tool } label: { Image(systemName: tool.symbol) }
+            .buttonStyle(ChromeIconButtonStyle(isOn: model.tool == tool, tint: tool == .laser ? .red : .accentColor))
+            .help(toolHelp(tool))
+            .accessibilityLabel(tool.title)
+            .accessibilityAddTraits(model.tool == tool ? .isSelected : [])
+            .staggered(index)
+    }
+
+    private var shapesMenu: some View {
+        let current = model.tool.isShape ? model.tool : nil
+        return Menu {
+            ForEach(WhiteboardTool.shapeTools, id: \.self) { tool in
+                Button { model.tool = tool } label: {
+                    Label(toolHelp(tool), systemImage: tool == current ? "checkmark" : tool.symbol)
+                }
+            }
+        } label: {
+            Image(systemName: current?.symbol ?? "square.on.circle")
+        }
+        .menuStyle(.button)
+        .buttonStyle(ChromeIconButtonStyle(isOn: current != nil))
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help(L10n.t("Shapes and text", "形狀與文字"))
+        .accessibilityLabel(L10n.t("Shapes and text", "形狀與文字"))
+    }
+
     private var toolBar: some View {
         HStack(spacing: 4) {
-            ForEach(Array(WhiteboardTool.allCases.enumerated()), id: \.element) { index, tool in
-                Button { model.tool = tool } label: { Image(systemName: tool.symbol) }
-                    .buttonStyle(ChromeIconButtonStyle(isOn: model.tool == tool))
-                    .help("\(tool.title)（\(tool.key)）")
-                    .accessibilityLabel(tool.title)
-                    .accessibilityAddTraits(model.tool == tool ? .isSelected : [])
-                    .staggered(index)
+            ForEach(Array(WhiteboardTool.barTools.enumerated()), id: \.element) { index, tool in
+                toolButton(tool, index: index)
             }
+            shapesMenu.staggered(3)
+            toolButton(.eraser, index: 4)
 
             ChromeDivider()
 
@@ -293,12 +508,12 @@ struct WhiteboardView: View {
                     swatch(color, index: index)
                 }
             }
-            .opacity(model.tool == .eraser ? 0.45 : 1)
+            .opacity(model.tool == .eraser || model.tool == .laser ? 0.45 : 1)
 
             ChromeDivider()
 
-            widthMenu.staggered(10)
-            backgroundMenu.staggered(11)
+            widthMenu.staggered(12)
+            backgroundMenu.staggered(13)
 
             ChromeDivider()
 
@@ -308,12 +523,18 @@ struct WhiteboardView: View {
                 .disabled(!model.canUndo)
                 .help(L10n.t("Undo (⌘Z)", "復原（⌘Z）"))
                 .accessibilityLabel(L10n.t("Undo", "復原"))
-                .staggered(12)
+                .staggered(14)
             Button(action: onInsertScreenshot) { Image(systemName: "camera.viewfinder") }
                 .buttonStyle(ChromeIconButtonStyle())
                 .help(L10n.t("Insert Screenshot as New Page", "插入螢幕截圖為新頁面"))
                 .accessibilityLabel(L10n.t("Insert Screenshot", "插入螢幕截圖"))
-                .staggered(13)
+                .staggered(15)
+            Button(action: onToggleFullScreen) { Image(systemName: "arrow.up.left.and.arrow.down.right") }
+                .buttonStyle(ChromeIconButtonStyle())
+                .keyboardShortcut("f", modifiers: [.control, .command])
+                .help(L10n.t("Full Screen (⌃⌘F)", "全螢幕（⌃⌘F）"))
+                .accessibilityLabel(L10n.t("Full Screen", "全螢幕"))
+                .staggered(16)
             Menu {
                 Button(action: onExportPDF) {
                     Label(L10n.t("Export All Pages as PDF…", "匯出全部頁面為 PDF…"), systemImage: "doc.richtext")
@@ -327,7 +548,7 @@ struct WhiteboardView: View {
             .chromeIconMenu()
             .help(L10n.t("Export", "匯出"))
             .accessibilityLabel(L10n.t("Export", "匯出"))
-            .staggered(14)
+            .staggered(17)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
@@ -335,10 +556,10 @@ struct WhiteboardView: View {
     }
 
     private func swatch(_ color: WhiteboardColor, index: Int) -> some View {
-        let selected = model.color == color && model.tool != .eraser
+        let selected = model.color == color && model.tool != .eraser && model.tool != .laser
         return Button {
             model.color = color
-            if model.tool == .eraser { model.tool = .pen }
+            if model.tool == .eraser || model.tool == .laser { model.tool = .pen }
         } label: {
             Circle()
                 .fill(Color(cgColor: color.cgColor))
@@ -353,7 +574,7 @@ struct WhiteboardView: View {
         .buttonStyle(.plain)
         .accessibilityLabel(color.title)
         .accessibilityAddTraits(selected ? .isSelected : [])
-        .staggered(3 + index)
+        .staggered(5 + index)
     }
 
     private var widthMenu: some View {
@@ -361,7 +582,7 @@ struct WhiteboardView: View {
             ForEach(WhiteboardModel.widths, id: \.self) { width in
                 Button {
                     model.width = width
-                    if model.tool == .eraser { model.tool = .pen }
+                    if model.tool == .eraser || model.tool == .laser { model.tool = .pen }
                 } label: {
                     if model.width == width {
                         Label(Self.widthTitle(width), systemImage: "checkmark")
@@ -377,7 +598,7 @@ struct WhiteboardView: View {
                 .frame(width: 18, height: 18)
         }
         .chromeIconMenu()
-        .help(L10n.t("Line width", "線條粗細"))
+        .help(L10n.t("Line width and text size", "線條粗細與文字大小"))
         .accessibilityLabel(L10n.t("Line width", "線條粗細"))
         .accessibilityValue(Self.widthTitle(model.width))
     }
@@ -423,14 +644,22 @@ struct WhiteboardView: View {
                 .disabled(document.currentIndex == 0)
                 .help(L10n.t("Previous Page (←)", "上一頁（←）"))
                 .accessibilityLabel(L10n.t("Previous Page", "上一頁"))
-            Text("\(document.currentIndex + 1) / \(document.pages.count)")
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .contentTransition(.numericText())
-                .animation(.easeOut(duration: 0.15), value: document.currentIndex)
-                .frame(minWidth: 52)
-                .accessibilityLabel(L10n.t("Page \(document.currentIndex + 1) of \(document.pages.count)",
-                                           "第 \(document.currentIndex + 1) 頁，共 \(document.pages.count) 頁"))
+            Button { showingPages.toggle() } label: {
+                Text("\(document.currentIndex + 1) / \(document.pages.count)")
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                    .animation(.easeOut(duration: 0.15), value: document.currentIndex)
+                    .frame(minWidth: 52, minHeight: TeachLensChrome.iconHeight)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(L10n.t("Show all pages", "顯示所有頁面"))
+            .accessibilityLabel(L10n.t("Page \(document.currentIndex + 1) of \(document.pages.count)",
+                                       "第 \(document.currentIndex + 1) 頁，共 \(document.pages.count) 頁"))
+            .popover(isPresented: $showingPages, arrowEdge: .top) {
+                WhiteboardPagesView(model: model, onChange: onChange) { showingPages = false }
+            }
             Button { model.document.go(1); onChange() } label: { Image(systemName: "chevron.right") }
                 .buttonStyle(ChromeIconButtonStyle())
                 .disabled(document.currentIndex >= document.pages.count - 1)
@@ -467,6 +696,75 @@ struct WhiteboardView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .chromeSurface(Capsule())
+    }
+}
+
+/// Page thumbnails: click to jump, right-click to move a page.
+private struct WhiteboardPagesView: View {
+    @ObservedObject var model: WhiteboardModel
+    let onChange: () -> Void
+    let dismiss: () -> Void
+    @State private var thumbnails: [NSImage] = []
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 10) {
+                ForEach(Array(thumbnails.enumerated()), id: \.offset) { index, image in
+                    let current = index == model.document.currentIndex
+                    Button {
+                        model.document.currentIndex = index
+                        onChange()
+                        dismiss()
+                    } label: {
+                        VStack(spacing: 4) {
+                            Image(nsImage: image)
+                                .resizable()
+                                .aspectRatio(16 / 10, contentMode: .fit)
+                                .frame(width: 128)
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                                .overlay(RoundedRectangle(cornerRadius: 6)
+                                    .strokeBorder(current ? Color.accentColor : Color.primary.opacity(0.15),
+                                                  lineWidth: current ? 2.5 : 1))
+                            Text("\(index + 1)")
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(current ? Color.accentColor : .secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .contextMenu {
+                        Button { move(index, by: -1) } label: {
+                            Label(L10n.t("Move Earlier", "往前移"), systemImage: "arrow.left")
+                        }
+                        .disabled(index == 0)
+                        Button { move(index, by: 1) } label: {
+                            Label(L10n.t("Move Later", "往後移"), systemImage: "arrow.right")
+                        }
+                        .disabled(index >= thumbnails.count - 1)
+                    }
+                    .accessibilityLabel(L10n.t("Page \(index + 1)", "第 \(index + 1) 頁"))
+                }
+            }
+            .padding(14)
+        }
+        .frame(maxWidth: 620)
+        .onAppear(perform: render)
+    }
+
+    private func move(_ index: Int, by delta: Int) {
+        model.checkpoint()
+        model.document.movePage(from: index, by: delta)
+        onChange()
+        render()
+    }
+
+    /// Small renders of every page, made when the popover opens.
+    private func render() {
+        thumbnails = model.document.pages.map { page in
+            guard let data = WhiteboardRenderer.pngData(page, scale: 0.16), let image = NSImage(data: data) else {
+                return NSImage(size: NSSize(width: 256, height: 160))
+            }
+            return image
+        }
     }
 }
 
@@ -517,7 +815,8 @@ final class WhiteboardController: NSObject, NSWindowDelegate {
                 onChange: { [weak self] in self?.scheduleSave() },
                 onInsertScreenshot: { [weak self] in self?.insertScreenshot() },
                 onExportPDF: { [weak self] in self?.exportPDF() },
-                onExportPNG: { [weak self] in self?.exportPNG() }
+                onExportPNG: { [weak self] in self?.exportPNG() },
+                onToggleFullScreen: { [weak self] in self?.window?.toggleFullScreen(nil) }
             )
             let window = NSWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 1120, height: 760),
@@ -540,6 +839,21 @@ final class WhiteboardController: NSObject, NSWindowDelegate {
         }
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
+        showSharingTipOnce()
+    }
+
+    /// The whiteboard is its own window: if the class only sees a shared
+    /// window (e.g. the slides), students won't see it. Say so the first time.
+    private func showSharingTipOnce() {
+        let key = "whiteboardSharingTipShown"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        GlassToast.shared.show(
+            symbol: "rectangle.on.rectangle",
+            title: L10n.t("Students see the whiteboard only if you share it", "學生要看到白板，需分享它"),
+            message: L10n.t("Share your entire screen, or share the whiteboard window. ⌃⌘F makes it full screen.",
+                            "請分享整個螢幕，或在會議軟體改分享白板視窗；⌃⌘F 可切換全螢幕。"),
+            duration: 6)
     }
 
     func windowWillClose(_ notification: Notification) {

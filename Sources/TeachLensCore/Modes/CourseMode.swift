@@ -15,6 +15,13 @@ struct CourseMode: Codable, Equatable, Identifiable, Sendable {
     var cursorHighlight = false
     var captions = false
     var startBreakTimer = false
+    /// The students' system: Windows shows Ctrl + C in the keystroke pill.
+    /// Nil leaves the current choice alone.
+    var studentPlatform: KeystrokePlatform?
+    /// Where the keystroke pill sits for this mode; nil keeps the current spot.
+    var keystrokePosition: KeystrokePosition?
+    /// Shows or hides the Graphical Mode toolbar; nil leaves it as it is.
+    var showToolbar: Bool?
 
     static let builtInIDs: Set<String> = ["lecture", "coding", "focus", "break"]
 
@@ -23,10 +30,11 @@ struct CourseMode: Codable, Equatable, Identifiable, Sendable {
     static var builtIns: [CourseMode] {
         [
             CourseMode(id: "lecture", name: L10n.t("Lecture", "講解"), symbol: "person.wave.2",
-                       keystrokes: true, keystrokeFilter: .modifiers, cursorHighlight: true, captions: true),
+                       keystrokes: true, keystrokeFilter: .modifiers, cursorHighlight: true, captions: true,
+                       showToolbar: true),
             CourseMode(id: "coding", name: L10n.t("Coding Demo", "程式示範"), symbol: "chevron.left.forwardslash.chevron.right",
                        keystrokes: true, keystrokeFilter: .none, keystrokeHistory: true, keystrokeScale: 1.25,
-                       cursorHighlight: true),
+                       cursorHighlight: true, showToolbar: true),
             CourseMode(id: "focus", name: L10n.t("Focus", "重點強調"), symbol: "light.max",
                        keystrokes: false, spotlight: true),
             CourseMode(id: "break", name: L10n.t("Break", "休息"), symbol: "cup.and.saucer",
@@ -37,11 +45,13 @@ struct CourseMode: Codable, Equatable, Identifiable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case id, name, symbol, keystrokes, keystrokeFilter, keystrokeHistory, keystrokeScale
         case spotlight, cursorHighlight, captions, startBreakTimer
+        case studentPlatform, keystrokePosition, showToolbar
     }
 
     init(id: String, name: String, symbol: String = "rectangle.on.rectangle", keystrokes: Bool = true,
          keystrokeFilter: KeystrokeFilter = .modifiers, keystrokeHistory: Bool = false, keystrokeScale: Double = 1,
-         spotlight: Bool = false, cursorHighlight: Bool = false, captions: Bool = false, startBreakTimer: Bool = false) {
+         spotlight: Bool = false, cursorHighlight: Bool = false, captions: Bool = false, startBreakTimer: Bool = false,
+         studentPlatform: KeystrokePlatform? = nil, keystrokePosition: KeystrokePosition? = nil, showToolbar: Bool? = nil) {
         self.id = id
         self.name = name
         self.symbol = symbol
@@ -53,6 +63,9 @@ struct CourseMode: Codable, Equatable, Identifiable, Sendable {
         self.cursorHighlight = cursorHighlight
         self.captions = captions
         self.startBreakTimer = startBreakTimer
+        self.studentPlatform = studentPlatform
+        self.keystrokePosition = keystrokePosition
+        self.showToolbar = showToolbar
     }
 
     init(from decoder: Decoder) throws {
@@ -68,6 +81,9 @@ struct CourseMode: Codable, Equatable, Identifiable, Sendable {
         cursorHighlight = try c.decodeIfPresent(Bool.self, forKey: .cursorHighlight) ?? false
         captions = try c.decodeIfPresent(Bool.self, forKey: .captions) ?? false
         startBreakTimer = try c.decodeIfPresent(Bool.self, forKey: .startBreakTimer) ?? false
+        studentPlatform = try? c.decodeIfPresent(KeystrokePlatform.self, forKey: .studentPlatform)
+        keystrokePosition = try? c.decodeIfPresent(KeystrokePosition.self, forKey: .keystrokePosition)
+        showToolbar = try c.decodeIfPresent(Bool.self, forKey: .showToolbar)
     }
 }
 
@@ -136,13 +152,13 @@ final class CourseModeController: NSObject, NSMenuItemValidation {
     private let spotlight: SpotlightController
     private(set) var customModes: [CourseMode]
     private(set) var currentModeID: String?
-    private var toastPanel: NSPanel?
-    private var toastTask: Task<Void, Never>?
 
     /// Hooks for features owned elsewhere.
     var setCaptions: ((Bool) -> Void)?
     var captionsEnabled: (() -> Bool)?
     var startBreakTimer: (() -> Void)?
+    var setToolbar: ((Bool) -> Void)?
+    var toolbarVisible: (() -> Bool)?
 
     init(keystrokes: KeystrokeController, spotlight: SpotlightController, store: CourseModeStore = CourseModeStore()) {
         self.store = store
@@ -162,6 +178,8 @@ final class CourseModeController: NSObject, NSMenuItemValidation {
         restored.startBreakTimer = false
         // Never switch the microphone on by itself at launch.
         restored.captions = false
+        // The toolbar keeps the visibility the teacher last chose.
+        restored.showToolbar = nil
         apply(restored, showToast: false)
     }
 
@@ -176,6 +194,13 @@ final class CourseModeController: NSObject, NSMenuItemValidation {
     }
 
     var hasRestorePoint: Bool { restorePoint != nil }
+
+    /// Records which mode is current without applying anything (used when a
+    /// class ends and the earlier setup is put back).
+    func markCurrent(_ id: String?) {
+        currentModeID = id
+        store.currentModeID = id
+    }
 
     /// Puts back what was on before the first test.
     func restoreTestState() {
@@ -192,7 +217,10 @@ final class CourseModeController: NSObject, NSMenuItemValidation {
             $0.filter = mode.keystrokeFilter
             $0.showHistory = mode.keystrokeHistory
             $0.scale = mode.keystrokeScale
+            if let platform = mode.studentPlatform { $0.primaryPlatform = platform }
+            if let position = mode.keystrokePosition { $0.position = position }
         }
+        if let showToolbar = mode.showToolbar { setToolbar?(showToolbar) }
         spotlight.setSpotlight(mode.spotlight)
         spotlight.update { $0.highlightEnabled = mode.cursorHighlight }
         setCaptions?(mode.captions)
@@ -220,7 +248,10 @@ final class CourseModeController: NSObject, NSMenuItemValidation {
             spotlight: spotlight.spotlightOn,
             cursorHighlight: spotlight.settings.highlightEnabled,
             captions: captionsEnabled?() ?? false,
-            startBreakTimer: false
+            startBreakTimer: false,
+            studentPlatform: k.primaryPlatform,
+            keystrokePosition: k.position,
+            showToolbar: toolbarVisible?()
         )
     }
 
@@ -350,62 +381,7 @@ final class CourseModeController: NSObject, NSMenuItemValidation {
     // MARK: Toast
 
     private func showToast(_ mode: CourseMode) {
-        let view = CourseModeToast(name: mode.name, symbol: mode.symbol)
-        let hosting = NSHostingView(rootView: view)
-        let size = hosting.fittingSize
-        let panel = toastPanel ?? {
-            let panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-            panel.isOpaque = false
-            panel.backgroundColor = .clear
-            panel.hasShadow = false
-            panel.ignoresMouseEvents = true
-            panel.level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 2)
-            panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
-            panel.isReleasedWhenClosed = false
-            return panel
-        }()
-        toastPanel = panel
-        panel.contentView = hosting
-        let mouse = NSEvent.mouseLocation
-        let screen = NSScreen.screens.first(where: { NSMouseInRect(mouse, $0.frame, false) }) ?? NSScreen.main
-        if let visible = screen?.visibleFrame {
-            panel.setFrame(NSRect(x: visible.maxX - size.width - 24, y: visible.maxY - size.height - 24,
-                                  width: size.width, height: size.height), display: true)
-        }
-        panel.alphaValue = 1
-        panel.orderFrontRegardless()
-        toastTask?.cancel()
-        toastTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 1_600_000_000)
-            guard !Task.isCancelled, let panel = self?.toastPanel else { return }
-            NSAnimationContext.runAnimationGroup({ context in
-                context.duration = 0.3
-                panel.animator().alphaValue = 0
-            }, completionHandler: nil)
-        }
-    }
-}
-
-struct CourseModeToast: View {
-    let name: String
-    let symbol: String
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: symbol)
-                .font(.system(size: 18, weight: .semibold))
-            VStack(alignment: .leading, spacing: 1) {
-                Text(L10n.t("Course mode", "課程模式"))
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.7))
-                Text(name)
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-            }
-        }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 18)
-        .padding(.vertical, 12)
-        .modifier(KeystrokePillBackground(glass: .automatic, scale: 1))
-        .padding(16)
+        GlassToast.shared.show(symbol: mode.symbol, title: mode.name,
+                               message: L10n.t("Course mode applied", "已套用課程模式"))
     }
 }

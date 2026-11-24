@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import SwiftUI
 
 /// Owns the keystroke feature: the event tap, the Keyviz-style state machine,
@@ -18,6 +19,15 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
 
     /// Called after the toggle hotkey changes so global hotkeys can re-register.
     var onHotkeyChange: (() -> Void)?
+    /// Called after any setting changes (captions keep clear of the pills).
+    var onSettingsChange: ((KeystrokeSettings) -> Void)?
+    /// True while macOS secure input (a password field) is active: nothing is
+    /// shown, so typed passwords can never reach the screen.
+    private(set) var pausedForSecureInput = false
+    /// Reports whether Control is the only key held (for the shortcut card).
+    var onControlAlone: ((Bool) -> Void)?
+    private var controlAlone = false
+    private var displayObserver: NSObjectProtocol?
 
     init(store: KeystrokeSettingsStore = KeystrokeSettingsStore()) {
         self.store = store
@@ -28,6 +38,14 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
         super.init()
         self.tap = KeystrokeTap { [weak self] input in
             self?.handle(input)
+        }
+        displayObserver = NotificationCenter.default.addObserver(
+            forName: PresentationDisplay.didChange, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.panel != nil, let screen = PresentationDisplay.screen() else { return }
+                self.moveToScreen(screen)
+            }
         }
     }
 
@@ -81,6 +99,7 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
         if old.toggleKeyCode != settings.toggleKeyCode || old.toggleModifiers != settings.toggleModifiers {
             onHotkeyChange?()
         }
+        onSettingsChange?(settings)
     }
 
     // MARK: Activation
@@ -192,6 +211,8 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
     }
 
     private func tick() {
+        updateSecureInputPause()
+        if pausedForSecureInput { return }
         engine.tick(at: Self.now())
         // Nothing held or shown: skip the work entirely (the common idle case).
         if engine.groups.isEmpty && model.groups.isEmpty { return }
@@ -206,7 +227,25 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
 
     // MARK: Input
 
+    /// Pauses the HUD while a password field has secure input on, and says
+    /// so once when "Every key" is chosen (the case where it matters).
+    private func updateSecureInputPause() {
+        let secure = IsSecureEventInputEnabled()
+        guard secure != pausedForSecureInput else { return }
+        pausedForSecureInput = secure
+        if secure {
+            engine.reset()
+            model.groups = []
+            if settings.filter == .none {
+                GlassToast.shared.show(symbol: "lock.fill",
+                                       title: L10n.t("Password field — keystrokes paused", "密碼輸入中，已暫停顯示按鍵"),
+                                       message: L10n.t("They come back when you leave the field.", "離開密碼欄位後會自動恢復。"))
+            }
+        }
+    }
+
     private func handle(_ input: KeystrokeInput) {
+        if pausedForSecureInput { return }
         let now = Self.now()
         switch input.kind {
         case .keyDown(let name):
@@ -226,6 +265,12 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
             engine.mouseMoved(x: input.x, y: input.y, at: now)
         case .scroll(let deltaY):
             engine.scroll(deltaY: deltaY, at: now)
+        }
+        let pressed = engine.pressedKeys
+        let alone = pressed.count == 1 && (pressed[0] == KeyName.controlLeft || pressed[0] == KeyName.controlRight)
+        if alone != controlAlone {
+            controlAlone = alone
+            onControlAlone?(alone)
         }
         publish()
     }
@@ -262,6 +307,8 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
     }
 
     private func followPointer(x: Double, y: Double) {
+        // A chosen presentation display keeps the HUD where students look.
+        if PresentationDisplay.fixedScreen != nil { return }
         let point = CGPoint(x: x, y: y)
         if screenFrame.contains(point), panel != nil { return }
         guard let screen = NSScreen.screens.first(where: { Self.cgFrame(of: $0).contains(point) })
@@ -291,9 +338,7 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
             panel.contentView = hosting
             self.panel = panel
         }
-        let mouse = NSEvent.mouseLocation
-        let screen = NSScreen.screens.first(where: { NSMouseInRect(mouse, $0.frame, false) }) ?? NSScreen.main
-        if let screen {
+        if let screen = PresentationDisplay.screen() {
             moveToScreen(screen)
         }
         panel?.orderFrontRegardless()
@@ -327,7 +372,7 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
         }
         let s = CGFloat(min(max(settings.scale, 0.5), 3))
         let view = KeystrokeStackView(groups: model.groups, position: settings.position, scale: s, glass: .solid,
-                                      showWindows: settings.windowsEquivalent)
+                                      showWindows: settings.windowsEquivalent, primary: settings.primaryPlatform)
             .padding(16 * s)
         let renderer = ImageRenderer(content: view)
         renderer.scale = panel.backingScaleFactor
@@ -365,6 +410,10 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
         add(L10n.t("Click Ripples", "點擊漣漪"), #selector(toggleClickRipples))
         add(L10n.t("Keep History", "保留歷史"), #selector(toggleHistory))
         add(L10n.t("Windows Equivalents", "Windows 對照"), #selector(toggleWindowsEquivalent))
+        menu.addItem(.separator())
+        for platform in KeystrokePlatform.allCases {
+            add(platform.title, #selector(setPrimaryPlatform(_:)), platform.rawValue)
+        }
         menu.addItem(.separator())
         for position in KeystrokePosition.allCases {
             add(position.title, #selector(setPosition(_:)), position.rawValue)
@@ -412,6 +461,12 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
         update { $0.windowsEquivalent.toggle() }
     }
 
+    @objc private func setPrimaryPlatform(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String,
+              let platform = KeystrokePlatform(rawValue: raw) else { return }
+        update { $0.primaryPlatform = platform }
+    }
+
     @objc private func toggleHistory() {
         update { $0.showHistory.toggle() }
         engine.clearGroups()
@@ -451,6 +506,8 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
             menuItem.state = settings.showHistory ? .on : .off
         case #selector(toggleWindowsEquivalent):
             menuItem.state = settings.windowsEquivalent ? .on : .off
+        case #selector(setPrimaryPlatform(_:)):
+            menuItem.state = (menuItem.representedObject as? String) == settings.primaryPlatform.rawValue ? .on : .off
         case #selector(setPosition(_:)):
             menuItem.state = raw == settings.position.rawValue ? .on : .off
         case #selector(setGlass(_:)):

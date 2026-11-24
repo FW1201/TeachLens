@@ -22,6 +22,44 @@ enum TeachingSelfTests {
         try testGraphicalToolsLayout()
         try testWhiteboardScreenshotScaling()
         try testWhiteboardUndoSkipsNoOps()
+        try testWhiteboardShapesAndPages()
+        try testSettingsGroups()
+    }
+
+    private static func testSettingsGroups() throws {
+        let groups = SettingsWindowController.paneGroups
+        try expect(groups.count <= 8, "Settings should show at most eight groups, got \(groups.count)")
+        let members = groups.flatMap(\.members)
+        try expect(Set(members) == Set(SettingsWindowController.settingsTabTitles) && members.count == Set(members).count,
+                   "Every settings pane should belong to exactly one group")
+        for group in groups {
+            let symbol = SettingsWindowController.paneSymbolName(for: group.id)
+            try expect(NSImage(systemSymbolName: symbol, accessibilityDescription: nil) != nil,
+                       "Group \(group.id) needs a resolvable SF Symbol, got \(symbol)")
+        }
+        try expect(groups.first?.id == "Check", "Check & Test should stay first")
+    }
+
+    private static func testWhiteboardShapesAndPages() throws {
+        // Boards saved before shapes existed still load.
+        let old = Data(#"{"points":[[1,2]],"color":{"r":0,"g":0,"b":0},"width":4,"isHighlighter":false}"#.utf8)
+        let stroke = try JSONDecoder().decode(WhiteboardStroke.self, from: old)
+        try expect(stroke.kind == .free, "Whiteboard: old strokes should load as free strokes")
+
+        var document = WhiteboardDocument()
+        let box = WhiteboardStroke(points: [CGPoint(x: 100, y: 100), CGPoint(x: 300, y: 200)],
+                                   color: WhiteboardColor.palette[0], width: 4, isHighlighter: false, kind: .rectangle)
+        document.currentPage.strokes = [box]
+        document.erase(at: CGPoint(x: 200, y: 150), radius: 10)
+        try expect(document.currentPage.strokes.count == 1, "Whiteboard: erasing inside a box should not hit its outline")
+        document.erase(at: CGPoint(x: 200, y: 100), radius: 10)
+        try expect(document.currentPage.strokes.isEmpty, "Whiteboard: erasing on the box edge should remove it")
+
+        document.addPage()
+        document.addPage()
+        document.currentIndex = 0
+        document.movePage(from: 0, by: 2)
+        try expect(document.currentIndex == 2, "Whiteboard: the moved current page should stay current")
     }
 
     private static func testWhiteboardScreenshotScaling() throws {
@@ -68,6 +106,8 @@ enum TeachingSelfTests {
         let height = GraphicalToolsLayout.expandedHeight(originY: low.y, in: short)
         try expect(low.y + height <= short.maxY && height >= GraphicalToolsLayout.collapsedHeight,
                    "On a short screen the column should stay on screen and scroll")
+        try expect(ToolbarTool.defaultPinned.count == 6 && Set(ToolbarTool.defaultPinned).count == 6,
+                   "The toolbar should pin six distinct tools by default")
     }
 
     private static func testLanguageSetting() throws {
