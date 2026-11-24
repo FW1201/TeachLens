@@ -184,6 +184,16 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSTableViewDat
         window.makeKeyAndOrderFront(nil)
     }
 
+    /// Selects a pane by id in the sidebar.
+    func select(pane id: String) {
+        guard let row = Self.sidebarRows.firstIndex(where: {
+            if case .pane(let paneID) = $0 { return paneID == id }
+            return false
+        }) else { return }
+        sidebarTableView?.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+        settingsTabView?.selectTabViewItem(withIdentifier: id)
+    }
+
     func windowWillClose(_ notification: Notification) {
         // Cancel any in-progress recording (which resumes the global hotkeys if
         // they were suspended for capture).

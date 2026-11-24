@@ -8,6 +8,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var courseModeController: CourseModeController?
     private var whiteboardController: WhiteboardController?
     private var languageObserver: NSObjectProtocol?
+    private var classSession: ClassSession?
+    private var classItem: NSMenuItem?
+    private var graphicalItem: NSMenuItem?
+    private var isRecording = false
+    private var onboarding: OnboardingController?
 
     /// Rebuilds the status menu and Settings in the newly chosen language.
     private func applyLanguageChange() {
@@ -130,6 +135,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let modeCoordinator, modeCoordinator.mode != .breakTimer else { return }
             modeCoordinator.handle(.toggleBreakTimer)
         }
+        courseModeController.setToolbar = { [weak self] on in
+            self?.setGraphicalTools(on)
+        }
+        courseModeController.toolbarVisible = {
+            UserDefaults.standard.bool(forKey: GraphicalTools.preference)
+        }
         self.courseModeController = courseModeController
 
         appController = AppController(
@@ -156,7 +167,17 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         if let teaching = appController?.teaching {
             graphicalTools = GraphicalTools(teaching: teaching)
             graphicalTools?.setVisible(UserDefaults.standard.bool(forKey: GraphicalTools.preference))
+            let onboarding = OnboardingController(teaching: teaching)
+            onboarding.onFinish = { [weak self] in self?.setGraphicalTools(true) }
+            OnboardingController.shared = onboarding
+            self.onboarding = onboarding
         }
+        let classSession = ClassSession(courseModes: courseModeController, testCenter: testCenter)
+        classSession.onChange = { [weak self] inClass in self?.classStateChanged(inClass) }
+        classSession.openCheck = { [weak self] in self?.appController?.showSettings(pane: "Check") }
+        classSession.isRecording = { [weak self] in self?.isRecording ?? false }
+        self.classSession = classSession
+
         statusItem = makeStatusItem(controller: appController!, courseModes: courseModeController)
         languageObserver = NotificationCenter.default.addObserver(
             forName: L10n.didChangeNotification, object: nil, queue: .main
@@ -167,6 +188,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.graphicalTools?.setCaptureActive(active)
         }
         modeCoordinator.onRecordingStateChanged = { [weak self, weak captionController] recording in
+            self?.isRecording = recording
             self?.graphicalTools?.recording = recording
             self?.updateRecordingIndicator(recording)
             captionController?.recordingStateChanged(recording)
@@ -176,13 +198,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         spotlightController.start()
         courseModeController.restoreLastMode()
 
-        // On a fresh install, open Settings so the user has a clear entry point
-        // instead of a silent menu-bar-only launch (issue #21). Upgrading users
-        // are detected as returning by hasCompletedFirstLaunch, so they don't get
-        // an unexpected pop-up. Persist the flag either way so later launches no
-        // longer depend on the legacy migration sentinel.
+        // On a fresh install, open the three-step guide so the user has a clear
+        // entry point instead of a silent menu-bar-only launch (issue #21).
+        // Upgrading users are detected as returning by hasCompletedFirstLaunch,
+        // so they don't get an unexpected pop-up.
         if !settingsStore.hasCompletedFirstLaunch {
-            appController?.showSettings()
+            onboarding?.show()
         }
         settingsStore.markFirstLaunchCompleted()
 
@@ -210,21 +231,21 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                 .withSymbolConfiguration(config)
             image?.size = NSSize(width: Self.menuBarIconGlyph, height: Self.menuBarIconGlyph)
             button.image = image
+            button.contentTintColor = nil
         } else {
             button.image = Self.menuBarIcon()
+            button.contentTintColor = classSession?.inClass == true ? .systemGreen : nil
         }
     }
 
+    /// The menu-bar menu, kept short: the class switch, course modes and the
+    /// toolbar on top, every tool in one Tools submenu, then Check & Test,
+    /// Settings and Quit.
     private func makeStatusItem(controller: AppController, courseModes: CourseModeController) -> NSStatusItem {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         // Intentionally no autosaveName: persisting an absolute menu-bar slot makes
         // AppKit re-assert that position on every relaunch/relayout, which fights
-        // menu-bar managers like Bartender and Ice (the icon snaps back out of their
-        // "shown" section). Letting the system place the item keeps TeachLens compatible
-        // with those tools; users can still Command-drag it to reorder.
-        // Use the Windows ZoomIt icon (document with a magnifying glass) rendered
-        // as a black template image so it tints to match the menu bar, following
-        // the macOS convention for menu-bar icons.
+        // menu-bar managers like Bartender and Ice. Users can still Command-drag it.
         if let button = item.button {
             if let image = Self.menuBarIcon() {
                 button.image = image
@@ -234,73 +255,132 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let menu = NSMenu()
-        for entry in Self.statusMenuEntries() {
-            if entry.isSeparator {
-                menu.addItem(.separator())
-            } else {
-                let menuItem = NSMenuItem(title: entry.title, action: entry.action, keyEquivalent: entry.keyEquivalent)
-                menuItem.image = Self.menuSymbol(entry.symbol)
-                menu.addItem(menuItem)
-            }
-        }
 
-        for item in menu.items {
-            item.target = controller
-        }
+        let classItem = NSMenuItem(title: "", action: #selector(toggleClass(_:)), keyEquivalent: "")
+        classItem.target = self
+        self.classItem = classItem
+        menu.addItem(classItem)
 
-        // Keystroke overlay: the toggle shows a checkmark via the keystroke
-        // controller's menu validation, followed by its options submenu.
-        if let index = menu.items.firstIndex(where: { $0.action == #selector(AppController.toggleKeystrokes) }) {
-            let toggleItem = menu.items[index]
-            toggleItem.target = controller.keystrokeController
-            toggleItem.action = #selector(KeystrokeController.toggle)
-            let optionsItem = NSMenuItem(title: L10n.t("Keystroke Options", "按鍵顯示選項"), action: nil, keyEquivalent: "")
-            optionsItem.submenu = controller.keystrokeController.makeMenu()
-            menu.insertItem(optionsItem, at: index + 1)
-        }
-        // Course modes sit right below Settings.
         let modesItem = NSMenuItem(title: L10n.t("Course Mode", "課程模式"), action: nil, keyEquivalent: "")
         modesItem.image = Self.menuSymbol("square.stack")
         modesItem.submenu = courseModes.makeMenu()
         courseModes.menuItem = modesItem
-        menu.insertItem(modesItem, at: 1)
+        menu.addItem(modesItem)
 
-        if let index = menu.items.firstIndex(where: { $0.action == #selector(AppController.toggleWhiteboard) }),
-           let whiteboard = whiteboardController {
-            menu.items[index].target = whiteboard
-            menu.items[index].action = #selector(WhiteboardController.toggle)
-        }
-        if let index = menu.items.firstIndex(where: { $0.action == #selector(AppController.toggleCaptions) }) {
-            let toggleItem = menu.items[index]
-            toggleItem.target = controller.captionController
-            toggleItem.action = #selector(CaptionController.toggle)
-            let optionsItem = NSMenuItem(title: L10n.t("Caption Options", "字幕選項"), action: nil, keyEquivalent: "")
-            optionsItem.submenu = controller.captionController.makeMenu()
-            menu.insertItem(optionsItem, at: index + 1)
-        }
-        if let index = menu.items.firstIndex(where: { $0.action == #selector(AppController.toggleSpotlight) }) {
-            let toggleItem = menu.items[index]
-            toggleItem.target = controller.spotlightController
-            toggleItem.action = #selector(SpotlightController.toggleSpotlight)
-            let optionsItem = NSMenuItem(title: L10n.t("Spotlight Options", "聚光燈選項"), action: nil, keyEquivalent: "")
-            optionsItem.submenu = controller.spotlightController.makeMenu()
-            menu.insertItem(optionsItem, at: index + 1)
-        }
-
-        let graphicalItem = NSMenuItem(title: L10n.t("Graphical Mode", "圖形介面模式"),
+        let graphicalItem = NSMenuItem(title: L10n.t("Floating Toolbar", "圖形工具列"),
                                        action: #selector(toggleGraphicalTools(_:)), keyEquivalent: "")
         graphicalItem.target = self
         graphicalItem.image = Self.menuSymbol("square.grid.2x2")
         graphicalItem.state = UserDefaults.standard.bool(forKey: GraphicalTools.preference) ? .on : .off
-        menu.insertItem(graphicalItem, at: 2)
+        self.graphicalItem = graphicalItem
+        menu.addItem(graphicalItem)
+        menu.addItem(.separator())
+
+        // Every tool, with its options, in one submenu.
+        let tools = NSMenu(title: L10n.t("Tools", "工具"))
+        let skipped: Set<Selector> = [#selector(AppController.showSettings), #selector(AppController.checkPermissions),
+                                      #selector(AppController.quit)]
+        for entry in Self.statusMenuEntries() {
+            if let action = entry.action, skipped.contains(action) { continue }
+            if entry.isSeparator {
+                if tools.items.last?.isSeparatorItem == false { tools.addItem(.separator()) }
+                continue
+            }
+            let menuItem = NSMenuItem(title: entry.title, action: entry.action, keyEquivalent: entry.keyEquivalent)
+            menuItem.image = Self.menuSymbol(entry.symbol)
+            menuItem.target = controller
+            tools.addItem(menuItem)
+        }
+        if tools.items.last?.isSeparatorItem == true { tools.removeItem(at: tools.items.count - 1) }
+
+        // Keystroke overlay: the toggle shows a checkmark via the keystroke
+        // controller's menu validation, followed by its options submenu.
+        if let index = tools.items.firstIndex(where: { $0.action == #selector(AppController.toggleKeystrokes) }) {
+            let toggleItem = tools.items[index]
+            toggleItem.target = controller.keystrokeController
+            toggleItem.action = #selector(KeystrokeController.toggle)
+            let optionsItem = NSMenuItem(title: L10n.t("Keystroke Options", "按鍵顯示選項"), action: nil, keyEquivalent: "")
+            optionsItem.image = Self.menuSymbol("slider.horizontal.3")
+            optionsItem.submenu = controller.keystrokeController.makeMenu()
+            tools.insertItem(optionsItem, at: index + 1)
+        }
+        if let index = tools.items.firstIndex(where: { $0.action == #selector(AppController.toggleWhiteboard) }),
+           let whiteboard = whiteboardController {
+            tools.items[index].target = whiteboard
+            tools.items[index].action = #selector(WhiteboardController.toggle)
+        }
+        if let index = tools.items.firstIndex(where: { $0.action == #selector(AppController.toggleCaptions) }) {
+            let toggleItem = tools.items[index]
+            toggleItem.target = controller.captionController
+            toggleItem.action = #selector(CaptionController.toggle)
+            let optionsItem = NSMenuItem(title: L10n.t("Caption Options", "字幕選項"), action: nil, keyEquivalent: "")
+            optionsItem.image = Self.menuSymbol("slider.horizontal.3")
+            optionsItem.submenu = controller.captionController.makeMenu()
+            tools.insertItem(optionsItem, at: index + 1)
+        }
+        if let index = tools.items.firstIndex(where: { $0.action == #selector(AppController.toggleSpotlight) }) {
+            let toggleItem = tools.items[index]
+            toggleItem.target = controller.spotlightController
+            toggleItem.action = #selector(SpotlightController.toggleSpotlight)
+            let optionsItem = NSMenuItem(title: L10n.t("Spotlight Options", "聚光燈選項"), action: nil, keyEquivalent: "")
+            optionsItem.image = Self.menuSymbol("slider.horizontal.3")
+            optionsItem.submenu = controller.spotlightController.makeMenu()
+            tools.insertItem(optionsItem, at: index + 1)
+        }
+        let toolsItem = NSMenuItem(title: L10n.t("Tools", "工具"), action: nil, keyEquivalent: "")
+        toolsItem.image = Self.menuSymbol("wrench.and.screwdriver")
+        toolsItem.submenu = tools
+        menu.addItem(toolsItem)
+        menu.addItem(.separator())
+
+        let checkItem = NSMenuItem(title: L10n.t("Check & Test…", "總覽與測試…"),
+                                   action: #selector(openCheckAndTest(_:)), keyEquivalent: "")
+        checkItem.target = self
+        checkItem.image = Self.menuSymbol("checkmark.shield")
+        menu.addItem(checkItem)
+        let settingsItem = NSMenuItem(title: L10n.t("Settings…", "設定…"),
+                                      action: #selector(AppController.showSettings), keyEquivalent: ",")
+        settingsItem.target = controller
+        settingsItem.image = Self.menuSymbol("gearshape")
+        menu.addItem(settingsItem)
+        menu.addItem(.separator())
+        let quitItem = NSMenuItem(title: L10n.t("Quit", "結束 TeachLens"), action: #selector(AppController.quit),
+                                  keyEquivalent: "q")
+        quitItem.target = controller
+        quitItem.image = Self.menuSymbol("power")
+        menu.addItem(quitItem)
+
         item.menu = menu
+        statusItem = item
+        classStateChanged(classSession?.inClass ?? false)
         return item
     }
 
+    @objc private func toggleClass(_ sender: NSMenuItem) {
+        classSession?.toggle()
+    }
+
+    @objc private func openCheckAndTest(_ sender: NSMenuItem) {
+        appController?.showSettings(pane: "Check")
+    }
+
+    /// Menu title and menu-bar tint follow the class state: green while in class.
+    private func classStateChanged(_ inClass: Bool) {
+        classItem?.title = inClass ? L10n.t("End Class", "下課") : L10n.t("Start Class", "開始上課")
+        classItem?.image = Self.menuSymbol(inClass ? "stop.circle" : "play.circle")
+        if !isRecording {
+            statusItem?.button?.contentTintColor = inClass ? .systemGreen : nil
+        }
+    }
+
     @objc private func toggleGraphicalTools(_ sender: NSMenuItem) {
-        let enabled = sender.state != .on
+        setGraphicalTools(sender.state != .on)
+    }
+
+    /// Shows or hides the floating toolbar and remembers the choice.
+    func setGraphicalTools(_ enabled: Bool) {
         UserDefaults.standard.set(enabled, forKey: GraphicalTools.preference)
-        sender.state = enabled ? .on : .off
+        graphicalItem?.state = enabled ? .on : .off
         graphicalTools?.setVisible(enabled)
     }
 
