@@ -46,6 +46,7 @@ jobs:
       - name: Install and launch smoke test
         run: |
           set -x
+          set +e
           MNT="$(mktemp -d)"
           hdiutil attach ".build/TeachLens-Dev.dmg" -mountpoint "$MNT" -nobrowse -quiet
           rm -rf "/Applications/TeachLens (Dev).app"
@@ -54,8 +55,12 @@ jobs:
           xattr -dr com.apple.quarantine "/Applications/TeachLens (Dev).app" || true
           codesign --verify --deep --strict --verbose=2 "/Applications/TeachLens (Dev).app"
           mkdir -p smoke
+          codesign -d --entitlements :- "/Applications/TeachLens (Dev).app" > smoke/entitlements.plist 2>&1 || true
+          if grep -q "com.apple.developer" smoke/entitlements.plist; then
+            echo "::error::Ad-hoc build still carries restricted entitlements"; FAILED=1
+          fi
           START="$(date +%s)"
-          open "/Applications/TeachLens (Dev).app"
+          open "/Applications/TeachLens (Dev).app" > smoke/open.txt 2>&1 || { cat smoke/open.txt; echo "::error::launch failed"; FAILED=1; }
           sleep 15
           screencapture -x smoke/after-launch.png || true
           if ! pgrep -x TeachLens > smoke/pid.txt; then

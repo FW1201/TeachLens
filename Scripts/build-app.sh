@@ -199,10 +199,22 @@ if [[ "$SIGN_IDENTITY" == "-" ]]; then
     # Entitlements are embedded even for ad-hoc builds so the ESRP re-sign in
     # the official pipeline preserves them, and so local hardened-runtime tests
     # can still reach the camera and microphone.
+    #
+    # Restricted entitlements (com.apple.developer.*, e.g. speech-recognition)
+    # need a provisioning profile; on an ad-hoc signature macOS refuses to
+    # launch the app ("Launchd job spawn failed", POSIX 162). Strip them here.
+    # Speech recognition outside the sandbox only needs the Info.plist usage
+    # description, so dictation and captions keep working.
+    ADHOC_ENTITLEMENTS="$(mktemp -d)/entitlements.plist"
+    cp "$ENTITLEMENTS" "$ADHOC_ENTITLEMENTS"
+    for key in $(/usr/libexec/PlistBuddy -c "Print" "$ADHOC_ENTITLEMENTS" | sed -n 's/^ *\(com\.apple\.developer\.[^ ]*\) = .*/\1/p'); do
+        /usr/libexec/PlistBuddy -c "Delete :$key" "$ADHOC_ENTITLEMENTS"
+    done
     codesign --force --deep --sign - \
-        --entitlements "$ENTITLEMENTS" \
+        --entitlements "$ADHOC_ENTITLEMENTS" \
         --requirements "=designated => identifier \"$BUNDLE_ID\"" \
         "$APP_PATH" >/dev/null
+    rm -f "$ADHOC_ENTITLEMENTS"
 else
     # Official build: sign with the provided Developer ID identity and enable
     # the hardened runtime so the app can be notarized. codesign derives the
