@@ -4,6 +4,30 @@ import UniformTypeIdentifiers
 
 enum WhiteboardTool: String, CaseIterable, Sendable {
     case pen, highlighter, eraser
+
+    var title: String {
+        switch self {
+        case .pen: return L10n.t("Pen", "畫筆")
+        case .highlighter: return L10n.t("Highlighter", "螢光筆")
+        case .eraser: return L10n.t("Eraser", "橡皮擦")
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .pen: return "pencil.tip"
+        case .highlighter: return "highlighter"
+        case .eraser: return "eraser"
+        }
+    }
+
+    var key: String {
+        switch self {
+        case .pen: return "P"
+        case .highlighter: return "H"
+        case .eraser: return "E"
+        }
+    }
 }
 
 @MainActor
@@ -12,7 +36,10 @@ final class WhiteboardModel: ObservableObject {
     @Published var tool: WhiteboardTool = .pen
     @Published var color: WhiteboardColor = WhiteboardColor.palette[0]
     @Published var width: Double = 4
+    @Published private(set) var canUndo = false
     private var undoStack: [WhiteboardDocument] = []
+
+    static let widths: [Double] = [2, 4, 8, 12]
 
     init(document: WhiteboardDocument) {
         self.document = document
@@ -21,26 +48,55 @@ final class WhiteboardModel: ObservableObject {
     func checkpoint() {
         undoStack.append(document)
         if undoStack.count > 100 { undoStack.removeFirst() }
+        if !canUndo { canUndo = true }
+    }
+
+    /// Drops the checkpoint taken for a gesture that changed nothing (an eraser
+    /// tap that missed every stroke), so Undo isn't spent on a no-op.
+    func discardCheckpointIfUnchanged() {
+        guard let last = undoStack.last, last == document else { return }
+        undoStack.removeLast()
+        canUndo = !undoStack.isEmpty
     }
 
     func undo() {
         guard let last = undoStack.popLast() else { return }
         document = last
+        canUndo = !undoStack.isEmpty
     }
 }
 
 /// The drawing surface. Maps the view to the fixed page canvas (aspect fit).
+///
+/// Performance: the page (background, screenshot and finished strokes) is
+/// rendered once into a bitmap at the view's pixel size and reused, so a drag
+/// only draws that bitmap plus the stroke in progress instead of decoding the
+/// screenshot and re-stroking every line on every mouse event.
 final class WhiteboardCanvasView: NSView {
     var model: WhiteboardModel?
     var onChange: (() -> Void)?
     private var activeStroke: WhiteboardStroke?
+    private var cachedPage: WhiteboardPage?
+    private var cachedPixelSize: CGSize = .zero
+    private var cachedImage: CGImage?
+
+    /// Room kept around the page for the floating toolbars.
+    static let insets = NSEdgeInsets(top: 66, left: 28, bottom: 62, right: 28)
+    /// Pointer moves shorter than this (canvas points) don't add a point.
+    static let minimumPointSpacing: CGFloat = 1.2
+    static let eraserRadius: Double = 14
 
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
+    override var isOpaque: Bool { true }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     private var pageRect: CGRect {
-        WhiteboardRenderer.aspectFit(WhiteboardDocument.canvasSize, in: bounds.insetBy(dx: 12, dy: 12))
+        let i = Self.insets
+        let area = CGRect(x: bounds.minX + i.left, y: bounds.minY + i.top,
+                          width: max(1, bounds.width - i.left - i.right),
+                          height: max(1, bounds.height - i.top - i.bottom))
+        return WhiteboardRenderer.aspectFit(WhiteboardDocument.canvasSize, in: area).integral
     }
 
     private func canvasPoint(_ event: NSEvent) -> CGPoint {
@@ -50,25 +106,64 @@ final class WhiteboardCanvasView: NSView {
         return CGPoint(x: (p.x - rect.minX) * scale, y: (p.y - rect.minY) * scale)
     }
 
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        cachedImage = nil
+        needsDisplay = true
+    }
+
+    private func pageImage(_ page: WhiteboardPage, pixelSize: CGSize) -> CGImage? {
+        if let cachedImage, cachedPixelSize == pixelSize, cachedPage == page { return cachedImage }
+        let width = Int(pixelSize.width), height = Int(pixelSize.height)
+        guard width > 0, height > 0,
+              let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        context.interpolationQuality = .high
+        context.translateBy(x: 0, y: CGFloat(height))
+        context.scaleBy(x: CGFloat(width) / WhiteboardDocument.canvasSize.width,
+                        y: -CGFloat(height) / WhiteboardDocument.canvasSize.height)
+        WhiteboardRenderer.draw(page, in: context)
+        cachedImage = context.makeImage()
+        cachedPage = page
+        cachedPixelSize = pixelSize
+        return cachedImage
+    }
+
     override func draw(_ dirtyRect: NSRect) {
-        NSColor.windowBackgroundColor.setFill()
-        bounds.fill()
+        NSColor.underPageBackgroundColor.setFill()
+        dirtyRect.fill()
         guard let model, let context = NSGraphicsContext.current?.cgContext else { return }
         let rect = pageRect
+        let backing = window?.backingScaleFactor ?? 2
+
         context.saveGState()
-        context.setShadow(offset: CGSize(width: 0, height: 2), blur: 10, color: CGColor(gray: 0, alpha: 0.25))
+        context.setShadow(offset: CGSize(width: 0, height: 3), blur: 14, color: CGColor(gray: 0, alpha: 0.22))
         context.setFillColor(CGColor(gray: 1, alpha: 1))
-        context.fill(rect)
+        context.addPath(CGPath(roundedRect: rect, cornerWidth: 6, cornerHeight: 6, transform: nil))
+        context.fillPath()
         context.restoreGState()
 
         context.saveGState()
-        context.clip(to: rect)
-        context.translateBy(x: rect.minX, y: rect.minY)
-        let scale = rect.width / WhiteboardDocument.canvasSize.width
-        context.scaleBy(x: scale, y: scale)
-        var page = model.document.currentPage
-        if let activeStroke { page.strokes.append(activeStroke) }
-        WhiteboardRenderer.draw(page, in: context)
+        context.addPath(CGPath(roundedRect: rect, cornerWidth: 6, cornerHeight: 6, transform: nil))
+        context.clip()
+        if let image = pageImage(model.document.currentPage,
+                                 pixelSize: CGSize(width: rect.width * backing, height: rect.height * backing)) {
+            // The bitmap is upright; flip locally because this view is flipped.
+            context.saveGState()
+            context.translateBy(x: rect.minX, y: rect.maxY)
+            context.scaleBy(x: 1, y: -1)
+            context.draw(image, in: CGRect(origin: .zero, size: rect.size))
+            context.restoreGState()
+        }
+        if let activeStroke {
+            context.translateBy(x: rect.minX, y: rect.minY)
+            let scale = rect.width / WhiteboardDocument.canvasSize.width
+            context.scaleBy(x: scale, y: scale)
+            context.setLineCap(.round)
+            context.setLineJoin(.round)
+            WhiteboardRenderer.stroke(activeStroke, in: context)
+        }
         context.restoreGState()
     }
 
@@ -79,7 +174,7 @@ final class WhiteboardCanvasView: NSView {
         model.checkpoint()
         switch model.tool {
         case .eraser:
-            model.document.erase(at: point, radius: 14)
+            model.document.erase(at: point, radius: Self.eraserRadius)
         case .pen, .highlighter:
             let highlighter = model.tool == .highlighter
             activeStroke = WhiteboardStroke(points: [point], color: model.color,
@@ -93,11 +188,17 @@ final class WhiteboardCanvasView: NSView {
         guard let model else { return }
         let point = canvasPoint(event)
         if model.tool == .eraser {
-            model.document.erase(at: point, radius: 14)
-        } else {
-            activeStroke?.points.append(point)
+            model.document.erase(at: point, radius: Self.eraserRadius)
+            needsDisplay = true
+        } else if var stroke = activeStroke {
+            // Skip sub-pixel moves: high-rate trackpads send many, and every
+            // point costs memory, save time and drawing time later.
+            if let last = stroke.points.last,
+               hypot(point.x - last.x, point.y - last.y) < Self.minimumPointSpacing { return }
+            stroke.points.append(point)
+            activeStroke = stroke
+            needsDisplay = true
         }
-        needsDisplay = true
     }
 
     override func mouseUp(with event: NSEvent) {
@@ -105,6 +206,8 @@ final class WhiteboardCanvasView: NSView {
         if let stroke = activeStroke {
             model.document.currentPage.strokes.append(stroke)
             activeStroke = nil
+        } else {
+            model.discardCheckpointIfUnchanged()
         }
         needsDisplay = true
         onChange?()
@@ -147,6 +250,8 @@ struct WhiteboardCanvas: NSViewRepresentable {
     }
 }
 
+/// The whiteboard window's content: the page fills the window and two
+/// floating glass bars carry the controls, matching Graphical Mode.
 struct WhiteboardView: View {
     @ObservedObject var model: WhiteboardModel
     let onChange: () -> Void
@@ -155,89 +260,213 @@ struct WhiteboardView: View {
     let onExportPNG: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
-            toolbar
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-            Divider()
+        ZStack {
             WhiteboardCanvas(model: model, onChange: onChange)
+            VStack {
+                toolBar
+                Spacer(minLength: 0)
+                pageBar
+            }
+            .padding(.vertical, 12)
+            .padding(.horizontal, 16)
         }
         .frame(minWidth: 760, minHeight: 520)
     }
 
-    private var toolbar: some View {
-        HStack(spacing: 12) {
-            Picker("", selection: $model.tool) {
-                Image(systemName: "pencil.tip").tag(WhiteboardTool.pen)
-                Image(systemName: "highlighter").tag(WhiteboardTool.highlighter)
-                Image(systemName: "eraser").tag(WhiteboardTool.eraser)
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 140)
-            .help(L10n.t("Pen (P) · Highlighter (H) · Eraser (E)", "畫筆（P）· 螢光筆（H）· 橡皮擦（E）"))
+    // MARK: Tool bar
 
-            HStack(spacing: 6) {
-                ForEach(Array(WhiteboardColor.palette.enumerated()), id: \.offset) { _, color in
-                    Button {
-                        model.color = color
-                        if model.tool == .eraser { model.tool = .pen }
-                    } label: {
-                        Circle()
-                            .fill(Color(cgColor: color.cgColor))
-                            .overlay(Circle().strokeBorder(Color.primary.opacity(model.color == color ? 0.9 : 0.2),
-                                                           lineWidth: model.color == color ? 2.5 : 1))
-                            .frame(width: 20, height: 20)
-                    }
-                    .buttonStyle(.plain)
+    private var toolBar: some View {
+        HStack(spacing: 4) {
+            ForEach(Array(WhiteboardTool.allCases.enumerated()), id: \.element) { index, tool in
+                Button { model.tool = tool } label: { Image(systemName: tool.symbol) }
+                    .buttonStyle(ChromeIconButtonStyle(isOn: model.tool == tool))
+                    .help("\(tool.title)（\(tool.key)）")
+                    .accessibilityLabel(tool.title)
+                    .accessibilityAddTraits(model.tool == tool ? .isSelected : [])
+                    .staggered(index)
+            }
+
+            ChromeDivider()
+
+            HStack(spacing: 5) {
+                ForEach(Array(WhiteboardColor.palette.enumerated()), id: \.offset) { index, color in
+                    swatch(color, index: index)
                 }
             }
+            .opacity(model.tool == .eraser ? 0.45 : 1)
 
-            Slider(value: $model.width, in: 1...16, step: 1)
-                .frame(width: 90)
-                .help(L10n.t("Line width", "線條粗細"))
+            ChromeDivider()
 
-            Picker("", selection: Binding(
-                get: { model.document.currentPage.background },
-                set: { value in
-                    model.checkpoint()
-                    model.document.currentPage.background = value
-                    onChange()
-                }
-            )) {
-                ForEach(WhiteboardBackground.allCases, id: \.self) { Text($0.title).tag($0) }
-            }
-            .frame(width: 100)
+            widthMenu.staggered(10)
+            backgroundMenu.staggered(11)
 
-            Spacer(minLength: 8)
+            ChromeDivider()
 
-            Button { model.document.go(-1); onChange() } label: { Image(systemName: "chevron.left") }
-                .disabled(model.document.currentIndex == 0)
-            Text("\(model.document.currentIndex + 1) / \(model.document.pages.count)")
-                .monospacedDigit()
-                .frame(minWidth: 52)
-            Button { model.document.go(1); onChange() } label: { Image(systemName: "chevron.right") }
-                .disabled(model.document.currentIndex >= model.document.pages.count - 1)
-
+            Button { model.undo(); onChange() } label: { Image(systemName: "arrow.uturn.backward") }
+                .buttonStyle(ChromeIconButtonStyle())
+                .keyboardShortcut("z", modifiers: .command)
+                .disabled(!model.canUndo)
+                .help(L10n.t("Undo (⌘Z)", "復原（⌘Z）"))
+                .accessibilityLabel(L10n.t("Undo", "復原"))
+                .staggered(12)
+            Button(action: onInsertScreenshot) { Image(systemName: "camera.viewfinder") }
+                .buttonStyle(ChromeIconButtonStyle())
+                .help(L10n.t("Insert Screenshot as New Page", "插入螢幕截圖為新頁面"))
+                .accessibilityLabel(L10n.t("Insert Screenshot", "插入螢幕截圖"))
+                .staggered(13)
             Menu {
-                Button(L10n.t("New Page", "新增頁面")) { model.checkpoint(); model.document.addPage(); onChange() }
-                Button(L10n.t("Insert Screenshot as New Page", "插入螢幕截圖為新頁面")) { onInsertScreenshot() }
-                Button(L10n.t("Clear Page", "清除本頁")) {
+                Button(action: onExportPDF) {
+                    Label(L10n.t("Export All Pages as PDF…", "匯出全部頁面為 PDF…"), systemImage: "doc.richtext")
+                }
+                Button(action: onExportPNG) {
+                    Label(L10n.t("Export This Page as PNG…", "匯出本頁為 PNG…"), systemImage: "photo")
+                }
+            } label: {
+                Image(systemName: "square.and.arrow.up")
+            }
+            .chromeIconMenu()
+            .help(L10n.t("Export", "匯出"))
+            .accessibilityLabel(L10n.t("Export", "匯出"))
+            .staggered(14)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .chromeSurface(Capsule())
+    }
+
+    private func swatch(_ color: WhiteboardColor, index: Int) -> some View {
+        let selected = model.color == color && model.tool != .eraser
+        return Button {
+            model.color = color
+            if model.tool == .eraser { model.tool = .pen }
+        } label: {
+            Circle()
+                .fill(Color(cgColor: color.cgColor))
+                .overlay(Circle().strokeBorder(Color.primary.opacity(0.25), lineWidth: 1))
+                .frame(width: 18, height: 18)
+                .padding(3)
+                .overlay(Circle().strokeBorder(Color.accentColor, lineWidth: selected ? 2 : 0))
+                .scaleEffect(selected ? 1.08 : 1)
+                .animation(.easeOut(duration: 0.15), value: selected)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(color.title)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .staggered(3 + index)
+    }
+
+    private var widthMenu: some View {
+        Menu {
+            ForEach(WhiteboardModel.widths, id: \.self) { width in
+                Button {
+                    model.width = width
+                    if model.tool == .eraser { model.tool = .pen }
+                } label: {
+                    if model.width == width {
+                        Label(Self.widthTitle(width), systemImage: "checkmark")
+                    } else {
+                        Text(Self.widthTitle(width))
+                    }
+                }
+            }
+        } label: {
+            Circle()
+                .fill(Color.primary)
+                .frame(width: 4 + model.width, height: 4 + model.width)
+                .frame(width: 18, height: 18)
+        }
+        .chromeIconMenu()
+        .help(L10n.t("Line width", "線條粗細"))
+        .accessibilityLabel(L10n.t("Line width", "線條粗細"))
+        .accessibilityValue(Self.widthTitle(model.width))
+    }
+
+    static func widthTitle(_ width: Double) -> String {
+        switch width {
+        case ..<3: return L10n.t("Fine", "細")
+        case ..<6: return L10n.t("Medium", "中")
+        case ..<10: return L10n.t("Bold", "粗")
+        default: return L10n.t("Extra Bold", "特粗")
+        }
+    }
+
+    private var backgroundMenu: some View {
+        let current = model.document.currentPage.background
+        return Menu {
+            ForEach(WhiteboardBackground.allCases, id: \.self) { background in
+                Button {
+                    guard background != model.document.currentPage.background else { return }
+                    model.checkpoint()
+                    model.document.currentPage.background = background
+                    onChange()
+                } label: {
+                    Label(background.title, systemImage: background == current ? "checkmark" : background.symbol)
+                }
+            }
+        } label: {
+            Image(systemName: current.symbol)
+        }
+        .chromeIconMenu()
+        .help(L10n.t("Background", "背景"))
+        .accessibilityLabel(L10n.t("Background", "背景"))
+        .accessibilityValue(current.title)
+    }
+
+    // MARK: Page bar
+
+    private var pageBar: some View {
+        let document = model.document
+        return HStack(spacing: 4) {
+            Button { model.document.go(-1); onChange() } label: { Image(systemName: "chevron.left") }
+                .buttonStyle(ChromeIconButtonStyle())
+                .disabled(document.currentIndex == 0)
+                .help(L10n.t("Previous Page (←)", "上一頁（←）"))
+                .accessibilityLabel(L10n.t("Previous Page", "上一頁"))
+            Text("\(document.currentIndex + 1) / \(document.pages.count)")
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .contentTransition(.numericText())
+                .animation(.easeOut(duration: 0.15), value: document.currentIndex)
+                .frame(minWidth: 52)
+                .accessibilityLabel(L10n.t("Page \(document.currentIndex + 1) of \(document.pages.count)",
+                                           "第 \(document.currentIndex + 1) 頁，共 \(document.pages.count) 頁"))
+            Button { model.document.go(1); onChange() } label: { Image(systemName: "chevron.right") }
+                .buttonStyle(ChromeIconButtonStyle())
+                .disabled(document.currentIndex >= document.pages.count - 1)
+                .help(L10n.t("Next Page (→)", "下一頁（→）"))
+                .accessibilityLabel(L10n.t("Next Page", "下一頁"))
+
+            ChromeDivider()
+
+            Button { model.checkpoint(); model.document.addPage(); onChange() } label: { Image(systemName: "plus") }
+                .buttonStyle(ChromeIconButtonStyle())
+                .help(L10n.t("New Page", "新增頁面"))
+                .accessibilityLabel(L10n.t("New Page", "新增頁面"))
+            Menu {
+                Button {
                     model.checkpoint()
                     model.document.currentPage.strokes = []
                     model.document.currentPage.imagePNG = nil
                     onChange()
+                } label: {
+                    Label(L10n.t("Clear Page", "清除本頁"), systemImage: "xmark.square")
                 }
-                Button(L10n.t("Delete Page", "刪除本頁")) { model.checkpoint(); model.document.deleteCurrentPage(); onChange() }
-                Divider()
-                Button(L10n.t("Undo", "復原")) { model.undo(); onChange() }
-                Divider()
-                Button(L10n.t("Export All Pages as PDF…", "匯出全部頁面為 PDF…")) { onExportPDF() }
-                Button(L10n.t("Export This Page as PNG…", "匯出本頁為 PNG…")) { onExportPNG() }
+                Button(role: .destructive) {
+                    model.checkpoint(); model.document.deleteCurrentPage(); onChange()
+                } label: {
+                    Label(L10n.t("Delete Page", "刪除本頁"), systemImage: "trash")
+                }
             } label: {
-                Label(L10n.t("Pages", "頁面"), systemImage: "doc.on.doc")
+                Image(systemName: "ellipsis")
             }
-            .fixedSize()
+            .chromeIconMenu()
+            .help(L10n.t("Page Options", "頁面選項"))
+            .accessibilityLabel(L10n.t("Page Options", "頁面選項"))
         }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .chromeSurface(Capsule())
     }
 }
 
@@ -248,11 +477,24 @@ final class WhiteboardController: NSObject, NSWindowDelegate {
     private let model: WhiteboardModel
     private var window: NSWindow?
     private var saveTask: Task<Void, Never>?
+    /// Encoding a page with a screenshot is megabytes of JSON; do it off the
+    /// main thread, one save at a time, so drawing never stutters.
+    private let saveQueue = DispatchQueue(label: "io.github.fw1201.teachlens.whiteboard-save", qos: .utility)
+    private var terminateObserver: NSObjectProtocol?
+
+    /// Screenshots are scaled down to this width before they are stored: twice
+    /// the page width is sharp in PDF and PNG exports and keeps saves small.
+    static let maxScreenshotWidth = Int(WhiteboardDocument.canvasSize.width * 2)
 
     init(store: WhiteboardStore = WhiteboardStore()) {
         self.store = store
         self.model = WhiteboardModel(document: store.load())
         super.init()
+        terminateObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.saveSynchronously() }
+        }
     }
 
     var isVisible: Bool { window?.isVisible ?? false }
@@ -284,11 +526,16 @@ final class WhiteboardController: NSObject, NSWindowDelegate {
                 defer: false
             )
             window.title = L10n.t("TeachLens Whiteboard", "TeachLens 白板")
+            window.titlebarAppearsTransparent = true
+            window.backgroundColor = .underPageBackgroundColor
             window.contentView = NSHostingView(rootView: view)
             window.isReleasedWhenClosed = false
             window.collectionBehavior = [.fullScreenPrimary]
+            _ = window.setFrameAutosaveName("TeachLensWhiteboard")
             window.delegate = self
-            window.center()
+            if !window.setFrameUsingName("TeachLensWhiteboard") {
+                window.center()
+            }
             self.window = window
         }
         NSApp.activate(ignoringOtherApps: true)
@@ -309,7 +556,18 @@ final class WhiteboardController: NSObject, NSWindowDelegate {
     }
 
     private func saveNow() {
-        store.save(model.document)
+        saveTask?.cancel()
+        let document = model.document
+        let store = self.store
+        saveQueue.async { store.save(document) }
+    }
+
+    /// At quit, write the latest document and wait for queued saves.
+    private func saveSynchronously() {
+        saveTask?.cancel()
+        let document = model.document
+        let store = self.store
+        saveQueue.sync { store.save(document) }
     }
 
     private func insertScreenshot() {
@@ -322,7 +580,7 @@ final class WhiteboardController: NSObject, NSWindowDelegate {
             window?.makeKeyAndOrderFront(nil)
             guard let self else { return }
             guard let image,
-                  let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) else {
+                  let png = Self.storablePNG(image) else {
                 let alert = NSAlert()
                 alert.messageText = L10n.t("Couldn’t capture the screen", "無法擷取螢幕")
                 alert.informativeText = L10n.t("Allow Screen Recording for TeachLens in System Settings, then reopen TeachLens.",
@@ -335,6 +593,23 @@ final class WhiteboardController: NSObject, NSWindowDelegate {
             self.model.document.currentPage.imagePNG = png
             self.scheduleSave()
         }
+    }
+
+    /// PNG data for a screenshot, scaled down to `maxScreenshotWidth`.
+    static func storablePNG(_ image: CGImage) -> Data? {
+        var output = image
+        if image.width > maxScreenshotWidth {
+            let width = maxScreenshotWidth
+            let height = max(1, Int((Double(image.height) * Double(width) / Double(image.width)).rounded()))
+            if let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                       space: CGColorSpaceCreateDeviceRGB(),
+                                       bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) {
+                context.interpolationQuality = .high
+                context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+                if let scaled = context.makeImage() { output = scaled }
+            }
+        }
+        return NSBitmapImageRep(cgImage: output).representation(using: .png, properties: [:])
     }
 
     func exportPDF() {

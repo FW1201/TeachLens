@@ -20,6 +20,34 @@ enum TeachingSelfTests {
         try testBuildCommitFallback()
         try testShortcutDescriptions()
         try testGraphicalToolsLayout()
+        try testWhiteboardScreenshotScaling()
+        try testWhiteboardUndoSkipsNoOps()
+    }
+
+    private static func testWhiteboardScreenshotScaling() throws {
+        let width = WhiteboardController.maxScreenshotWidth * 2, height = 1200
+        guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+              let image = context.makeImage(),
+              let png = WhiteboardController.storablePNG(image),
+              let rep = NSBitmapImageRep(data: png) else { throw SelfTestError.failure("Whiteboard: screenshot PNG") }
+        try expect(rep.pixelsWide == WhiteboardController.maxScreenshotWidth && rep.pixelsHigh == height / 2,
+                   "Whiteboard: large screenshots should be scaled to the stored width, got \(rep.pixelsWide)×\(rep.pixelsHigh)")
+    }
+
+    private static func testWhiteboardUndoSkipsNoOps() throws {
+        let model = WhiteboardModel(document: WhiteboardDocument())
+        model.checkpoint()
+        model.discardCheckpointIfUnchanged()
+        try expect(!model.canUndo, "Whiteboard: a gesture that changed nothing should not use an undo step")
+        model.checkpoint()
+        model.document.currentPage.strokes.append(
+            WhiteboardStroke(points: [.zero], color: WhiteboardColor.palette[0], width: 4, isHighlighter: false))
+        model.discardCheckpointIfUnchanged()
+        try expect(model.canUndo, "Whiteboard: a real change should keep its undo step")
+        model.undo()
+        try expect(model.document.currentPage.strokes.isEmpty && !model.canUndo, "Whiteboard: undo should restore the page")
     }
 
     private static func testGraphicalToolsLayout() throws {

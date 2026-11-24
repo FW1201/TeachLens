@@ -193,6 +193,8 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
 
     private func tick() {
         engine.tick(at: Self.now())
+        // Nothing held or shown: skip the work entirely (the common idle case).
+        if engine.groups.isEmpty && model.groups.isEmpty { return }
         // Visibility also changes without the groups changing (a held modifier
         // crossing its show delay), so always re-check; publish() skips no-ops.
         publish()

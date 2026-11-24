@@ -58,9 +58,8 @@ final class GraphicalTools: ObservableObject {
     private var panelTall = false
 
     /// The column slides up from the launcher; with Reduce Motion it fades.
-    static var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
     private static var openAnimation: Animation {
-        reduceMotion ? .easeOut(duration: 0.12) : .spring(response: 0.3, dampingFraction: 0.86)
+        TeachLensChrome.reduceMotion ? .easeOut(duration: 0.12) : .spring(response: 0.3, dampingFraction: 0.86)
     }
     private static let closeDuration: TimeInterval = 0.18
 
@@ -258,13 +257,17 @@ final class GraphicalTools: ObservableObject {
 // MARK: - Views
 
 private struct GraphicalToolsView: View {
+    @ObservedObject // MARK: - Views
+
+private struct GraphicalToolsView: View {
     @ObservedObject var tools: GraphicalTools
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 5) {
             if tools.expanded {
                 column
-                    .transition(GraphicalTools.reduceMotion
+                    .transition(reduceMotion
                         ? .opacity
                         : .move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.92, anchor: .bottom)))
             }
@@ -283,59 +286,64 @@ private struct GraphicalToolsView: View {
 
     // MARK: Column
 
-    @ViewBuilder private var column: some View {
-        #if compiler(>=6.2)
-        if #available(macOS 26.0, *) {
-            list.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 23))
-        } else {
-            list.background(.regularMaterial, in: RoundedRectangle(cornerRadius: 23))
-        }
-        #else
-        list.background(.regularMaterial, in: RoundedRectangle(cornerRadius: 23))
-        #endif
+    private var column: some View {
+        list.chromeSurface(RoundedRectangle(cornerRadius: 23, style: .continuous))
     }
 
     /// Listed top to bottom; the launcher sits below, so reading upward from the
-    /// launcher gives Course Modes, Keystrokes, Spotlight, … More.
+    /// launcher gives Course Modes, Keystrokes, Spotlight, … More. Icons arrive
+    /// in that order too (`staggered` counts up from the launcher).
     private var list: some View {
         ScrollView {
             VStack(spacing: 5) {
                 menu(L10n.t("More tools", "更多工具"), "ellipsis") {
-                    item(L10n.t("Recognize Text", "辨識文字"), .snipOcr)
-                    item(L10n.t("Copy Panorama", "複製長截圖"), .startPanorama(save: false))
-                    item(L10n.t("Save Panorama", "儲存長截圖"), .startPanorama(save: true))
+                    item(L10n.t("Recognize Text", "辨識文字"), "text.viewfinder", .snipOcr)
+                    item(L10n.t("Copy Panorama", "複製長截圖"), "rectangle.split.1x2", .startPanorama(save: false))
+                    item(L10n.t("Save Panorama", "儲存長截圖"), "square.and.arrow.down", .startPanorama(save: true))
                     #if !TEACHLENS_APP_STORE
-                    item("DemoType", .startDemoType)
+                    item("DemoType", "keyboard", .startDemoType)
                     #endif
-                    item("DemoMirror", .toggleDemoMirror(scope: .screen))
+                    item("DemoMirror", "rectangle.on.rectangle", .toggleDemoMirror(scope: .screen))
                 }
-                if tools.recording {
-                    button(L10n.t("Stop Recording", "停止錄影"), "stop.circle.fill",
-                           .toggleRecording(region: false), isOn: true, tint: .red)
-                } else {
-                    menu(L10n.t("Record", "錄影"), "record.circle") {
-                        item(L10n.t("Entire Screen", "全螢幕"), .toggleRecording(region: false))
-                        item(L10n.t("Region", "區域"), .toggleRecording(region: true))
+                .staggered(10)
+                Group {
+                    if tools.recording {
+                        button(L10n.t("Stop Recording", "停止錄影"), "stop.circle.fill",
+                               .toggleRecording(region: false), isOn: true, tint: .red)
+                    } else {
+                        menu(L10n.t("Record", "錄影"), "record.circle") {
+                            item(L10n.t("Entire Screen", "全螢幕"), "display", .toggleRecording(region: false))
+                            item(L10n.t("Region", "區域"), "rectangle.dashed", .toggleRecording(region: true))
+                        }
                     }
                 }
+                .staggered(9)
                 menu(L10n.t("Screenshot", "截圖"), "camera.viewfinder") {
-                    item(L10n.t("Copy Region", "複製區域"), .snipRegion(save: false))
-                    item(L10n.t("Save Region", "儲存區域"), .snipRegion(save: true))
+                    item(L10n.t("Copy Region", "複製區域"), "doc.on.clipboard", .snipRegion(save: false))
+                    item(L10n.t("Save Region", "儲存區域"), "square.and.arrow.down", .snipRegion(save: true))
                 }
+                .staggered(8)
                 button(L10n.t("Break Timer", "休息計時"), "timer", .toggleBreakTimer)
+                    .staggered(7)
                 button(L10n.t("Captions", "字幕"), "captions.bubble", .toggleCaptions,
                        isOn: tools.activeTools.contains(.captions))
+                    .staggered(6)
                 button(L10n.t("Whiteboard", "白板"), "rectangle.and.pencil.and.ellipsis", .toggleWhiteboard,
                        isOn: tools.activeTools.contains(.whiteboard))
+                    .staggered(5)
                 button(L10n.t("Draw", "畫筆"), "pencil.tip", .activateDrawWithoutZoom)
+                    .staggered(4)
                 menu(L10n.t("Zoom", "放大"), "magnifyingglass") {
-                    item(L10n.t("Static Zoom", "靜態放大"), .activateStaticZoom)
-                    item(L10n.t("Live Zoom", "即時放大"), .activateLiveZoom)
+                    item(L10n.t("Static Zoom", "靜態放大"), "plus.magnifyingglass", .activateStaticZoom)
+                    item(L10n.t("Live Zoom", "即時放大"), "dot.viewfinder", .activateLiveZoom)
                 }
+                .staggered(3)
                 button(L10n.t("Spotlight", "聚光燈"), "lightbulb", .toggleSpotlight,
                        isOn: tools.activeTools.contains(.spotlight))
+                    .staggered(2)
                 button(L10n.t("Keystrokes", "按鍵顯示"), "command", .toggleKeystrokes,
                        isOn: tools.activeTools.contains(.keystrokes))
+                    .staggered(1)
                 menu(L10n.t("Course Modes", "課程模式"), "square.stack") {
                     ForEach(tools.courseModes) { mode in
                         Button {
@@ -349,6 +357,7 @@ private struct GraphicalToolsView: View {
                         }
                     }
                 }
+                .staggered(0)
             }
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity)
@@ -358,25 +367,14 @@ private struct GraphicalToolsView: View {
 
     // MARK: Building blocks
 
-    private func icon(_ systemName: String, isOn: Bool, tint: Color) -> some View {
-        Image(systemName: systemName)
-            .foregroundStyle(isOn ? tint : Color.primary)
-            .frame(width: 30, height: 28)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(isOn ? tint.opacity(0.22) : Color.clear)
-            )
-            .contentShape(Rectangle())
-    }
-
     /// `isOn` is nil for one-shot actions; for toggles it drives the highlight
     /// and what VoiceOver reads.
     private func button(_ title: String, _ systemName: String, _ command: AppCommand,
                         isOn: Bool? = nil, tint: Color = .accentColor) -> some View {
         let on = isOn ?? false
         let state = on ? L10n.t("On", "開啟") : L10n.t("Off", "關閉")
-        return Button { tools.run(command) } label: { icon(systemName, isOn: on, tint: tint) }
-            .buttonStyle(.plain)
+        return Button { tools.run(command) } label: { Image(systemName: systemName) }
+            .buttonStyle(ChromeIconButtonStyle(isOn: on, tint: tint))
             .help(isOn == nil ? title : "\(title)（\(state)）")
             .accessibilityLabel(title)
             .accessibilityValue(isOn == nil ? "" : state)
@@ -388,17 +386,15 @@ private struct GraphicalToolsView: View {
         Menu {
             content()
         } label: {
-            icon(systemName, isOn: false, tint: .accentColor)
+            Image(systemName: systemName)
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .frame(width: 30, height: 28)
+        .chromeIconMenu()
         .help(title)
         .accessibilityLabel(title)
     }
 
-    private func item(_ title: String, _ command: AppCommand) -> some View {
-        Button(title) { tools.run(command) }
+    private func item(_ title: String, _ systemName: String, _ command: AppCommand) -> some View {
+        Button { tools.run(command) } label: { Label(title, systemImage: systemName) }
     }
 
     // MARK: Launcher
@@ -410,7 +406,9 @@ private struct GraphicalToolsView: View {
         let symbol = tools.expanded ? "chevron.down" : (tools.recording ? "record.circle.fill" : "square.grid.2x2")
         let control = Button { tools.toggleExpanded() } label: {
             Image(systemName: symbol)
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(tools.recording && !tools.expanded ? Color.red : Color.primary)
+                .contentTransition(.symbolEffect(.replace))
                 .frame(width: 36, height: 36)
                 .contentShape(Circle())
         }
@@ -421,18 +419,15 @@ private struct GraphicalToolsView: View {
         if #available(macOS 26.0, *) {
             control.buttonStyle(.glass).buttonBorderShape(.circle)
         } else {
-            control.buttonStyle(.plain).background(.regularMaterial, in: Circle())
+            control.buttonStyle(.plain).chromeSurface(Circle())
         }
         #else
-        control.buttonStyle(.plain).background(.regularMaterial, in: Circle())
+        control.buttonStyle(.plain).chromeSurface(Circle())
         #endif
     }
 }
 
-// MARK: - Panel
-
-private final class ToolsPanel: NSPanel {
-    var onDismiss: (() -> Void)?
+() -> Void)?
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
