@@ -60,17 +60,22 @@
 
 ### 3. 第一次開啟（略過 Gatekeeper）
 
-TeachLens 是開源免費版本，沒有付費向 Apple 公證，第一次開啟會被擋。任選一種方式：
+TeachLens 是開源免費版本，沒有付費向 Apple 公證，第一次開啟會被系統擋下。任選一種方式：
 
-- **方法 A**：在「應用程式」裡對 TeachLens **按右鍵 ▸ 打開 ▸ 打開**。
-- **方法 B**：打開「終端機」，貼上：
+- **方法 A（系統設定，不用打指令）**
+  1. 先雙擊 TeachLens 一次，出現被擋的訊息就按「完成」。
+  2. 打開 **系統設定 ▸ 隱私權與安全性**，捲到最下面的「安全性」區塊。
+  3. 按「已阻擋 TeachLens…」旁的 **強制打開（Open Anyway）**，輸入密碼或用 Touch ID 確認，再按 **打開**。
+- **方法 B（終端機一行指令）**：打開「終端機」，貼上：
 
   ```bash
   xattr -dr com.apple.quarantine "/Applications/TeachLens.app"
   ```
 
+> macOS 15 Sequoia 以後，「右鍵 ▸ 打開」已無法略過這個限制，請用上面兩種方法。macOS 14 仍可用右鍵 ▸ 打開。
+
 <!-- 截圖：02-gatekeeper-open.png -->
-<p align="center"><img src="docs/screenshots/02-gatekeeper-open.png" width="420" alt="右鍵打開確認（待補截圖）"></p>
+<p align="center"><img src="docs/screenshots/02-gatekeeper-open.png" width="420" alt="系統設定的強制打開按鈕（待補截圖）"></p>
 
 > 若出現「已損毀，無法打開」，同樣用方法 B 解決；這是未公證 App 的系統提示，不是檔案真的壞掉。
 
@@ -279,6 +284,9 @@ TeachLens 沒有 Dock 圖示，執行後在**畫面右上角選單列**出現金
 ---
 
 ## 常見問題
+
+**下載後被 Mac 擋下、無法打開或顯示「已損毀」？**
+這是未經 Apple 公證的開源 App 的正常提示，檔案沒有壞。到 **系統設定 ▸ 隱私權與安全性**，按 TeachLens 旁的 **強制打開**；或在終端機執行 `xattr -dr com.apple.quarantine "/Applications/TeachLens.app"`。詳見 [安裝步驟 3](#3-第一次開啟略過-gatekeeper)。
 
 **按鍵沒有顯示？**
 確認「輸入監控」已開啟 TeachLens，並**重新開啟 App**。選單列 ▸ Check Permissions 可檢查狀態。預設只顯示快捷鍵，單純打字不會出現；要顯示全部，到 Keystroke Options 取消「Shortcuts Only」。

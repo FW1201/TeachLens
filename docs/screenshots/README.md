@@ -6,7 +6,7 @@ README 中的每張圖都對應這裡的一個檔名。實測後把截圖存成�
 | 檔名 | 要拍的畫面 |
 |---|---|
 | `01-dmg-window.png` | 打開 DMG 後的視窗（TeachLens 圖示與「應用程式」捷徑） |
-| `02-gatekeeper-open.png` | 第一次開啟時按右鍵 ▸「打開」的確認對話框 |
+| `02-gatekeeper-open.png` | 系統設定 ▸ 隱私權與安全性 ▸「強制打開」按鈕 |
 | `03-permissions-dialog.png` | 選單列 ▸ Check Permissions 對話框 |
 | `04-input-monitoring.png` | 系統設定 ▸ 隱私權與安全性 ▸ 輸入監控，TeachLens 已開啟 |
 | `05-menu-bar.png` | 點選單列 TeachLens 圖示展開的完整選單 |
