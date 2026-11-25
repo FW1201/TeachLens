@@ -513,7 +513,7 @@ final class DemoMirrorController {
     private func presentAlert(_ message: String) {
         let alert = NSAlert()
         alert.messageText = message
-        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: L10n.t("OK", "好"))
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
     }

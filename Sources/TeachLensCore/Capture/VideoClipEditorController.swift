@@ -195,7 +195,7 @@ final class VideoClipEditorController: NSObject, NSWindowDelegate, VideoTimeline
 
         volumeButton = transportButton("speaker.wave.2.fill", #selector(toggleMute))
         volumeButton.contentTintColor = .secondaryLabelColor
-        volumeButton.toolTip = "Mute"
+        volumeButton.toolTip = L10n.t("Mute", "靜音")
         volumeSlider = NSSlider(value: 1, minValue: 0, maxValue: 1, target: self, action: #selector(volumeChanged))
         volumeSlider.widthAnchor.constraint(equalToConstant: 80).isActive = true
 
@@ -405,8 +405,8 @@ final class VideoClipEditorController: NSObject, NSWindowDelegate, VideoTimeline
         let effectiveVolume = volumeSlider?.floatValue ?? 0
         let muted = isMuted || effectiveVolume <= 0
         let symbol = muted ? "speaker.slash.fill" : (effectiveVolume < 0.5 ? "speaker.wave.1.fill" : "speaker.wave.2.fill")
-        volumeButton.image = NSImage(systemSymbolName: symbol, accessibilityDescription: muted ? "Unmute" : "Mute")
-        volumeButton.toolTip = muted ? "Unmute" : "Mute"
+        volumeButton.image = NSImage(systemSymbolName: symbol, accessibilityDescription: muted ? L10n.t("Unmute", "取消靜音") : L10n.t("Mute", "靜音"))
+        volumeButton.toolTip = muted ? L10n.t("Unmute", "取消靜音") : L10n.t("Mute", "靜音")
         volumeButton.contentTintColor = muted ? .secondaryLabelColor : .labelColor
         volumeSlider?.isEnabled = !muted
     }

@@ -54,11 +54,7 @@ jobs:
       - name: Create DMG
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          STAGE="$(mktemp -d)"
-          ditto ".build/TeachLens.app" "$STAGE/TeachLens.app"
-          ln -s /Applications "$STAGE/Applications"
-          hdiutil create -volname "TeachLens $VERSION" -srcfolder "$STAGE" -ov -format UDZO ".build/TeachLens-$VERSION.dmg"
-          hdiutil verify ".build/TeachLens-$VERSION.dmg"
+          zsh Scripts/make-dmg.sh ".build/TeachLens.app" "TeachLens $VERSION" ".build/TeachLens-$VERSION.dmg"
           shasum -a 256 ".build/TeachLens-$VERSION.dmg" | tee ".build/TeachLens-$VERSION.dmg.sha256"
 
       - name: Install and launch check

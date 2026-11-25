@@ -1167,7 +1167,7 @@ final class RecordingController {
     /// exported and the user picks where to save it.
     func openForTrim() {
         let open = NSOpenPanel()
-        open.title = "Trim Video"
+        open.title = L10n.t("Trim Video", "剪輯影片")
         open.allowedContentTypes = [.mpeg4Movie, .quickTimeMovie]
         open.canChooseDirectories = false
         open.allowsMultipleSelection = false

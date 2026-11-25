@@ -55,11 +55,7 @@ jobs:
           FULL_VERSION="$(tr -d '[:space:]' < VERSION)"
           test "$(defaults read "$PWD/.build/TeachLens (Dev).app/Contents/Info" CFBundleShortVersionString)" = "${FULL_VERSION%%-*}"
           test "$(defaults read "$PWD/.build/TeachLens (Dev).app/Contents/Info" TeachLensDisplayVersion)" = "$FULL_VERSION"
-          STAGE="$(mktemp -d)"
-          ditto ".build/TeachLens (Dev).app" "$STAGE/TeachLens (Dev).app"
-          ln -s /Applications "$STAGE/Applications"
-          hdiutil create -volname "TeachLens Dev" -srcfolder "$STAGE" -ov -format UDZO ".build/TeachLens-Dev.dmg"
-          hdiutil verify ".build/TeachLens-Dev.dmg"
+          zsh Scripts/make-dmg.sh ".build/TeachLens (Dev).app" "TeachLens Dev" ".build/TeachLens-Dev.dmg"
 
       - name: Install and launch smoke test
         run: |

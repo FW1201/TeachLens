@@ -78,11 +78,15 @@ final class ToolSettingsModel: NSObject, ObservableObject {
     let microphones = AudioDevices.availableMicrophones()
     let cameras = VideoDevices.availableCameras()
 
-    static let colorOptions: [(name: String, rgb: UInt32)] = [
-        (L10n.t("Red", "紅"), 0xFF0000), (L10n.t("Green", "綠"), 0x00FF00), (L10n.t("Blue", "藍"), 0x0000FF),
-        (L10n.t("Orange", "橘"), 0xFFA500), (L10n.t("Yellow", "黃"), 0xFFFF00), (L10n.t("Pink", "粉紅"), 0xFF69B4),
-        (L10n.t("White", "白"), 0xFFFFFF), (L10n.t("Black", "黑"), 0x000000),
-    ]
+    /// Computed, not `static let`: a stored list keeps the language that was
+    /// active the first time it was read (QA I-03).
+    static var colorOptions: [(name: String, rgb: UInt32)] {
+        [
+            (L10n.t("Red", "紅"), 0xFF0000), (L10n.t("Green", "綠"), 0x00FF00), (L10n.t("Blue", "藍"), 0x0000FF),
+            (L10n.t("Orange", "橘"), 0xFFA500), (L10n.t("Yellow", "黃"), 0xFFFF00), (L10n.t("Pink", "粉紅"), 0xFF69B4),
+            (L10n.t("White", "白"), 0xFFFFFF), (L10n.t("Black", "黑"), 0x000000),
+        ]
+    }
 
     init(store: SettingsStore, access: UserSelectedResourceAccess,
          onHotKeyChange: @escaping () -> Void, onSuspendHotkeys: @escaping () -> Void,
@@ -580,11 +584,13 @@ struct DemoTypeToolPane: View {
 struct BreakToolPane: View {
     @ObservedObject var model: ToolSettingsModel
 
-    private static let positions = [
-        L10n.t("Top-left", "左上"), L10n.t("Top", "上"), L10n.t("Top-right", "右上"),
-        L10n.t("Left", "左"), L10n.t("Center", "中央"), L10n.t("Right", "右"),
-        L10n.t("Bottom-left", "左下"), L10n.t("Bottom", "下"), L10n.t("Bottom-right", "右下"),
-    ]
+    private static var positions: [String] {
+        [
+            L10n.t("Top-left", "左上"), L10n.t("Top", "上"), L10n.t("Top-right", "右上"),
+            L10n.t("Left", "左"), L10n.t("Center", "中央"), L10n.t("Right", "右"),
+            L10n.t("Bottom-left", "左下"), L10n.t("Bottom", "下"), L10n.t("Bottom-right", "右下"),
+        ]
+    }
 
     var body: some View {
         let usesImage = model.settings.breakBackgroundMode == 2
@@ -683,10 +689,12 @@ private struct MicrophonePicker: View {
 struct RecordToolPane: View {
     @ObservedObject var model: ToolSettingsModel
 
-    private static let webcamPositions: [(String, Int)] = [
-        (L10n.t("Top-left", "左上"), 0), (L10n.t("Top-right", "右上"), 1), (L10n.t("Center", "中央"), 4),
-        (L10n.t("Bottom-left", "左下"), 2), (L10n.t("Bottom-right", "右下"), 3),
-    ]
+    private static var webcamPositions: [(String, Int)] {
+        [
+            (L10n.t("Top-left", "左上"), 0), (L10n.t("Top-right", "右上"), 1), (L10n.t("Center", "中央"), 4),
+            (L10n.t("Bottom-left", "左下"), 2), (L10n.t("Bottom-right", "右下"), 3),
+        ]
+    }
 
     var body: some View {
         let webcamOn = model.settings.webcamEnabled

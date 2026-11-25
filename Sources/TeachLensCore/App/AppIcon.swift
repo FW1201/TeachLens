@@ -2,8 +2,11 @@ import AppKit
 
 @MainActor
 enum TeachLensAppIcon {
+    /// Dock, alerts and the welcome guide use the same rounded-square icon as
+    /// Finder (TeachLensAppIcon.png: macOS margin and corners). The raw
+    /// TeachLensColorIcon artwork is full-bleed and showed as a hard square.
     static func apply() {
-        guard let image = loadColorIcon() ?? loadTemplateIcon() else { return }
+        guard let image = loadImage(named: "TeachLensAppIcon") ?? standardIcon(size: 512) else { return }
         image.isTemplate = false
         NSApp.applicationIconImage = image
 

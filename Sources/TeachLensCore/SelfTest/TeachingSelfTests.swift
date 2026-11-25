@@ -108,12 +108,31 @@ enum TeachingSelfTests {
         try expect(GraphicalToolsLayout.expandedHeight(originY: home.y, in: screen, items: items, scale: 1) == wanted,
                    "The open toolbar should fit its six tools without empty space")
         try expect(wanted < 400, "Six tools should need well under 400 pt, got \(wanted)")
+        for size in ToolbarSize.allCases {
+            let scale = size.scale
+            let available = GraphicalToolsLayout.columnHeight(items: items, scale: scale)
+                - GraphicalToolsLayout.columnPadding
+                - CGFloat(items) * (TeachLensChrome.iconHeight * scale + GraphicalToolsLayout.rowSpacing)
+            try expect(abs(available - 24 * scale) < 0.001,
+                       "The eye marker should have a 24 pt row that scales with toolbar size")
+        }
         // Large buttons make it taller and wider; small ones smaller.
         let large = GraphicalToolsLayout.expandedHeight(originY: home.y, in: screen, items: items, scale: ToolbarSize.large.scale)
         let small = GraphicalToolsLayout.expandedHeight(originY: home.y, in: screen, items: items, scale: ToolbarSize.small.scale)
         try expect(small < wanted && wanted < large, "Toolbar height should follow the button size")
         try expect(GraphicalToolsLayout.width(scale: ToolbarSize.large.scale) > GraphicalToolsLayout.width,
                    "Large buttons need a wider toolbar")
+        // Switching to Large while docked bottom-right keeps the right margin.
+        let docked = CGRect(origin: home, size: CGSize(width: GraphicalToolsLayout.width,
+                                                       height: GraphicalToolsLayout.collapsedHeight(scale: 1)))
+        let grown = GraphicalToolsLayout.resizedOrigin(from: docked, toScale: ToolbarSize.large.scale, in: screen)
+        let rightGap = screen.maxX - (grown.x + GraphicalToolsLayout.width(scale: ToolbarSize.large.scale))
+        try expect(abs(rightGap - GraphicalToolsLayout.margin) < 0.001,
+                   "A Large toolbar docked right should keep its \(GraphicalToolsLayout.margin) pt margin, got \(rightGap)")
+        let leftDocked = CGRect(x: screen.minX + 40, y: home.y, width: GraphicalToolsLayout.width, height: 56)
+        let leftGrown = GraphicalToolsLayout.resizedOrigin(from: leftDocked, toScale: ToolbarSize.large.scale, in: screen)
+        try expect(leftGrown.x == leftDocked.minX, "A toolbar on the left keeps its left edge when resized")
+        try expect(GraphicalToolsLayout.edgeInset >= 16, "Toolbar keeps at least 16 pt from screen edges")
         let short = CGRect(x: 0, y: 0, width: 800, height: 300)
         let low = GraphicalToolsLayout.clampedOrigin(CGPoint(x: 0, y: 200), in: short)
         let height = GraphicalToolsLayout.expandedHeight(originY: low.y, in: short)

@@ -2,32 +2,41 @@
 
 Read [`AGENTS.md`](AGENTS.md) first: build commands, code map and conventions.
 
-## Status (handoff from the cloud session, 2026-11-24)
+## Status (2026-11-25)
 
-- Work branch: `claude/kind-wright-s320u2` → **PR #11** (`1.3.0-beta.3`, draft). Do **not** merge until the owner has finished hands-on testing and the next round of fixes.
-- `main` is at `1.3.0-beta.2` (published as a GitHub pre-release).
-- The latest commits on the branch, not yet verified by CI (the macOS runners were saturated):
-  - toolbar button size Small/Medium/Large;
-  - the open column now fits its content;
-  - CI builds each PR once.
+- `VERSION` is **`1.3.0-beta.4`**: the last round before a small external test. It fixes the
+  2026-11-25 QA findings (I-03 English menu values, Trim Video title, toolbar edge margin,
+  eye-marker spacing) and makes the app icon a rounded square everywhere (Dock, welcome
+  guide, DMG volume). `1.3.0-beta.3` is the previous pre-release (PR #11, `9037f4f`).
+- Work branch: `claude/kind-wright-s320u2`, restarted from `main` after each merge.
+  Open a draft PR for new work; merge only when the owner asks.
+- CI (`.github/workflows/build.yml`) builds on **macOS 26 only**. The macOS 15 job was dropped
+  on 2026-11-24: its hosted runners stopped being assigned (cancelled after 15 minutes in the
+  queue, six runs in a row). The app still targets macOS 14+.
+- Before pushing, run `swift build && swift run TeachLensSelfTest` when a Mac is available.
 
-  Run `swift build && swift run TeachLensSelfTest` locally first. Fix anything that fails before other work.
-- Hands-on QA: plan in `docs/test-plans/1.3.0-beta.3-test-plan.md`, first-round report in `docs/test-reports/2026-11-24-1.3.0-beta.3.md`. Codex (computer use) runs the plan against the app built by `Scripts/build-app.sh`.
+## What beta.3 shipped
 
-## Phase (owner, 2026-11-24)
+- The 11 ZoomIt settings panes rewritten as SwiftUI grouped forms; hotkey conflicts name the
+  feature that owns the shortcut; optional shortcuts can be cleared.
+- Keystrokes: teacher-defined custom shortcuts (always shown, caption under the pill, Windows
+  override; test case E-14); "Shortcuts only" no longer shows a lone modifier.
+- Toolbar: Small / Medium / Large buttons; the open column fits its content; tighter spacing.
+- Fixes and performance: Settings no longer overwrites values changed elsewhere; video editor
+  uses the async AVFoundation `load…` APIs; about 1,450 lines of dead code removed.
 
-**Polish phase.** The overall structure is frozen: no new panes, windows, modules or settings
-architecture changes. Only fixes, wording, spacing, icons and small behavior tweaks.
+## Phase: polish
 
-- Done since the handoff: video editor async `load…` APIs (`42f562f`, `c4bac00`); custom
-  keystroke shortcuts with captions (`1921dee`, test case E-14).
-- A scheduled CI re-run is set for 2026-11-25 02:00 (Asia/Taipei).
+The overall structure is frozen: no new panes, windows, modules or settings architecture
+changes. Only fixes, wording, spacing, icons and small behavior tweaks.
 
-## Next round (agreed with the owner)
+## Next round
 
-1. Fix whatever the hands-on QA finds; update the report.
-2. ~~`Capture/VideoClipEditorController.swift`: async `load…` APIs~~ — done.
-3. CI runs on macOS 26 only (macOS 15 runners stopped being assigned; owner dropped it on 2026-11-24). Merge once it is green; the release workflow publishes the pre-release.
+1. The owner tests the beta.4 DMG by hand (Codex is no longer used). Plan:
+   `docs/test-plans/1.3.0-beta.3-test-plan.md`; report:
+   `docs/test-reports/2026-11-24-1.3.0-beta.3.md`.
+2. Fix what they report and update the report. Bump `VERSION` for the next pre-release;
+   the release workflow publishes on a `VERSION` change.
 
 ## Owner preferences
 

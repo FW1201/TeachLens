@@ -13,7 +13,7 @@ enum GraphicalToolsLayout {
     /// Default dock distance from the screen corner.
     static let margin: CGFloat = 24
     /// Closest the launcher may be dragged to any screen edge.
-    static let edgeInset: CGFloat = 12
+    static let edgeInset: CGFloat = 16
     /// Panel padding (3 on each side), the gap between column and launcher,
     /// and the column's own vertical padding and row spacing.
     static let panelPadding: CGFloat = 6
@@ -21,7 +21,7 @@ enum GraphicalToolsLayout {
     static let columnPadding: CGFloat = 20
     static let rowSpacing: CGFloat = 10
     /// The "students can't see this" marker row under the tools.
-    static let markerHeight: CGFloat = 14
+    static let markerHeight: CGFloat = 24
 
     static func width(scale: CGFloat) -> CGFloat { width * scale }
     static func collapsedHeight(scale: CGFloat) -> CGFloat { panelPadding + 50 * scale }
@@ -31,7 +31,7 @@ enum GraphicalToolsLayout {
     static func columnHeight(items: Int, scale: CGFloat) -> CGFloat {
         let rows = CGFloat(max(1, items))
         return columnPadding + rows * TeachLensChrome.iconHeight * scale + (rows - 1) * rowSpacing
-            + rowSpacing + markerHeight
+            + rowSpacing + markerHeight * scale
     }
 
     /// Default dock: bottom-right corner of the visible frame.
@@ -46,6 +46,15 @@ enum GraphicalToolsLayout {
         let x = min(max(origin.x, minX), max(minX, bounds.maxX - width(scale: scale) - edgeInset))
         let y = min(max(origin.y, minY), max(minY, bounds.maxY - minimumRoomAbove))
         return CGPoint(x: x, y: y)
+    }
+
+    /// Where the launcher goes when its size changes: a toolbar docked on the
+    /// right half of the screen keeps its right edge (so Large does not grow
+    /// into the screen edge), one on the left keeps its left edge.
+    static func resizedOrigin(from frame: CGRect, toScale scale: CGFloat, in bounds: CGRect) -> CGPoint {
+        let newWidth = width(scale: scale)
+        let x = frame.midX > bounds.midX ? frame.maxX - newWidth : frame.minX
+        return clampedOrigin(CGPoint(x: x, y: frame.minY), in: bounds, scale: scale)
     }
 
     /// Height of the panel when the column is open: just enough for the
@@ -190,7 +199,10 @@ final class GraphicalTools: ObservableObject {
         guard newSize != size else { return }
         size = newSize
         UserDefaults.standard.set(newSize.rawValue, forKey: Self.sizeKey)
-        if let panel { place(at: panel.frame.origin) }
+        guard let panel else { return }
+        let screen = NSScreen.screens.first { $0.visibleFrame.intersects(panel.frame) } ?? NSScreen.main
+        guard let bounds = screen?.visibleFrame else { return place(at: panel.frame.origin) }
+        place(at: GraphicalToolsLayout.resizedOrigin(from: panel.frame, toScale: newSize.scale, in: bounds))
     }
 
     /// Icon rows in the open column: the pinned tools plus More.
@@ -548,9 +560,11 @@ private struct GraphicalToolsView: View {
                     toolView(tool).staggered(pinned.count - index)
                 }
                 Image(systemName: "eye.slash")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 12 * tools.size.scale, weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .frame(height: GraphicalToolsLayout.markerHeight)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: GraphicalToolsLayout.markerHeight * tools.size.scale)
+                    .contentShape(Rectangle())
                     .help(L10n.t("Students can't see this toolbar: it is left out of shared screens and recordings.",
                                  "學生看不到這個工具列：分享畫面與錄影都不會擷取到它。"))
                     .accessibilityLabel(L10n.t("Hidden from students", "學生看不到"))
