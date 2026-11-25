@@ -4,8 +4,10 @@ Read [`AGENTS.md`](AGENTS.md) first: build commands, code map and conventions.
 
 ## Status (2026-11-25)
 
-- `main` is at **`1.3.0-beta.3`**, published as the GitHub pre-release `v1.3.0-beta.3`
-  (PR #11, merge `9037f4f`, DMG `TeachLens-1.3.0-beta.3.dmg`).
+- `VERSION` is **`1.3.0-beta.4`**: the last round before a small external test. It fixes the
+  2026-11-25 QA findings (I-03 English menu values, Trim Video title, toolbar edge margin,
+  eye-marker spacing) and makes the app icon a rounded square everywhere (Dock, welcome
+  guide, DMG volume). `1.3.0-beta.3` is the previous pre-release (PR #11, `9037f4f`).
 - Work branch: `claude/kind-wright-s320u2`, restarted from `main` after each merge.
   Open a draft PR for new work; merge only when the owner asks.
 - CI (`.github/workflows/build.yml`) builds on **macOS 26 only**. The macOS 15 job was dropped
@@ -30,12 +32,11 @@ changes. Only fixes, wording, spacing, icons and small behavior tweaks.
 
 ## Next round
 
-1. Hands-on QA of the beta.3 DMG. Plan: `docs/test-plans/1.3.0-beta.3-test-plan.md`.
-   Report: `docs/test-reports/2026-11-24-1.3.0-beta.3.md` (about 70 cases not yet run, plus E-14).
-   Codex (computer use) runs the plan against the installed app.
-2. Fix what QA finds and update the report.
-3. Next pre-release: bump `VERSION` to `1.3.0-beta.4`, merge when CI is green and the owner
-   asks. The release workflow publishes on a `VERSION` change.
+1. The owner tests the beta.4 DMG by hand (Codex is no longer used). Plan:
+   `docs/test-plans/1.3.0-beta.3-test-plan.md`; report:
+   `docs/test-reports/2026-11-24-1.3.0-beta.3.md`.
+2. Fix what they report and update the report. Bump `VERSION` for the next pre-release;
+   the release workflow publishes on a `VERSION` change.
 
 ## Owner preferences
 

@@ -5,6 +5,8 @@
 | 檔名 | 畫面與版本 |
 |---|---|
 | `19-whiteboard.png` | 多頁白板。擷取自 macOS 上的 TeachLens 1.3.0-beta.3 開發建置（`fa59335`）。 |
+| `21-floating-toolbar.png` | 展開的圖形工具列（中尺寸、眼睛提示加大後）。1.3.0-beta.3 `ddcd13a` 之後的 QA 建置，2026-11-25。 |
+| `22-windows-handout.png` | 匯出的 Mac ↔ Windows 對照講義第一頁（A4）。1.3.0-beta.3，2026-11-25。 |
 
 ## 待補拍
 

@@ -1,12 +1,13 @@
 # AGENTS.md — TeachLens
 
-Guide for coding and testing agents (Codex, Claude Code). Read this first to avoid searching the whole repo.
+Guide for coding agents (Claude Code). Read this first to avoid searching the whole repo.
 
 ## Current task pointers
 
-- **Hands-on test plan (1.3.0-beta.3):** [`docs/test-plans/1.3.0-beta.3-test-plan.md`](docs/test-plans/1.3.0-beta.3-test-plan.md)
+- **Hands-on test plan:** [`docs/test-plans/1.3.0-beta.3-test-plan.md`](docs/test-plans/1.3.0-beta.3-test-plan.md) (still valid for 1.3.0-beta.4)
+  - The owner tests by hand; Claude Code fixes what they report. Codex is no longer used.
   - Read §0 first. Some TeachLens windows are invisible to screenshots on purpose.
-  - Write results to `docs/test-reports/2026-11-24-1.3.0-beta.3.md` (format in §6).
+  - Results: `docs/test-reports/2026-11-24-1.3.0-beta.3.md` (format in §6).
 - Previous manual report: `docs/test-reports/2026-11-24-teachlens-manual-test.md`
 
 ## What TeachLens is
