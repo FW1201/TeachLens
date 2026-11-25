@@ -21,7 +21,7 @@ enum GraphicalToolsLayout {
     static let columnPadding: CGFloat = 20
     static let rowSpacing: CGFloat = 10
     /// The "students can't see this" marker row under the tools.
-    static let markerHeight: CGFloat = 14
+    static let markerHeight: CGFloat = 24
 
     static func width(scale: CGFloat) -> CGFloat { width * scale }
     static func collapsedHeight(scale: CGFloat) -> CGFloat { panelPadding + 50 * scale }
@@ -31,7 +31,7 @@ enum GraphicalToolsLayout {
     static func columnHeight(items: Int, scale: CGFloat) -> CGFloat {
         let rows = CGFloat(max(1, items))
         return columnPadding + rows * TeachLensChrome.iconHeight * scale + (rows - 1) * rowSpacing
-            + rowSpacing + markerHeight
+            + rowSpacing + markerHeight * scale
     }
 
     /// Default dock: bottom-right corner of the visible frame.
@@ -548,9 +548,11 @@ private struct GraphicalToolsView: View {
                     toolView(tool).staggered(pinned.count - index)
                 }
                 Image(systemName: "eye.slash")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 12 * tools.size.scale, weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .frame(height: GraphicalToolsLayout.markerHeight)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: GraphicalToolsLayout.markerHeight * tools.size.scale)
+                    .contentShape(Rectangle())
                     .help(L10n.t("Students can't see this toolbar: it is left out of shared screens and recordings.",
                                  "學生看不到這個工具列：分享畫面與錄影都不會擷取到它。"))
                     .accessibilityLabel(L10n.t("Hidden from students", "學生看不到"))
