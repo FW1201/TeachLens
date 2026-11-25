@@ -343,7 +343,9 @@ final class GraphicalTools: ObservableObject {
         window.hasShadow = false
         window.isReleasedWhenClosed = false
         window.hidesOnDeactivate = false
-        window.level = .floating
+        // Above the spotlight's dimming (screenSaver - 1), so the button that
+        // turns it off is never darkened. Hidden during zoom, draw and breaks.
+        window.level = .screenSaver
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         // Recording, panorama and screenshots build their filters without an
         // exclusion list, so keep the launcher out of every capture here.

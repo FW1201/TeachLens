@@ -150,6 +150,9 @@ final class SpotlightController: NSObject, NSMenuItemValidation {
     private var timer: Timer?
     private var lastPoint: NSPoint = .zero
     private var shake = ShakeDetector()
+    private var escapeMonitors: [Any] = []
+    /// Spotlight that is fading out: still drawn until the fade ends.
+    private var fadingOut = false
 
     var onHotkeyChange: (() -> Void)?
 
@@ -173,8 +176,62 @@ final class SpotlightController: NSObject, NSMenuItemValidation {
     }
 
     func setSpotlight(_ on: Bool) {
+        guard on != spotlightOn else { return }
         spotlightOn = on
-        refreshRunningState()
+        if on {
+            fadingOut = false
+            refreshRunningState()
+            fadeSpotlight(to: 1)
+            installEscapeMonitor()
+        } else {
+            removeEscapeMonitor()
+            // Fade the dimming out, then drop the panel if nothing else needs it.
+            fadingOut = true
+            fadeSpotlight(to: 0) { [weak self] in
+                guard let self, !self.spotlightOn else { return }
+                self.fadingOut = false
+                self.refreshRunningState()
+            }
+        }
+    }
+
+    /// Fades the dimming and rim in or out (instant with Reduce Motion).
+    private func fadeSpotlight(to opacity: Float, completion: (() -> Void)? = nil) {
+        let duration = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : 0.18
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { completion?() }
+        for layer in [dimLayer, rimLayer] {
+            if duration > 0 {
+                let fade = CABasicAnimation(keyPath: "opacity")
+                fade.fromValue = layer.presentation()?.opacity ?? layer.opacity
+                fade.toValue = opacity
+                fade.duration = duration
+                fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                layer.add(fade, forKey: "fade")
+            }
+            layer.opacity = opacity
+        }
+        CATransaction.commit()
+    }
+
+    /// Esc turns the spotlight off, whichever app is in front.
+    private func installEscapeMonitor() {
+        removeEscapeMonitor()
+        let escape: UInt16 = 53
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: .keyDown, handler: { [weak self] event in
+            guard event.keyCode == escape, event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty else { return }
+            Task { @MainActor in self?.setSpotlight(false) }
+        }) { escapeMonitors.append(global) }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: { [weak self] event in
+            guard event.keyCode == escape, event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty else { return event }
+            Task { @MainActor in self?.setSpotlight(false) }
+            return event
+        }) { escapeMonitors.append(local) }
+    }
+
+    private func removeEscapeMonitor() {
+        escapeMonitors.forEach(NSEvent.removeMonitor)
+        escapeMonitors = []
     }
 
     @objc func toggleHighlight() {
@@ -197,7 +254,7 @@ final class SpotlightController: NSObject, NSMenuItemValidation {
     // MARK: Running state
 
     private var needsPanel: Bool {
-        spotlightOn || settings.highlightEnabled || settings.shakeToFind
+        spotlightOn || fadingOut || settings.highlightEnabled || settings.shakeToFind
     }
 
     private func refreshRunningState() {
@@ -259,6 +316,9 @@ final class SpotlightController: NSObject, NSMenuItemValidation {
         pulseLayer.fillColor = NSColor.clear.cgColor
         pulseLayer.lineWidth = 6
         pulseLayer.opacity = 0
+        // The spotlight fades in from nothing (see fadeSpotlight).
+        dimLayer.opacity = spotlightOn ? 1 : 0
+        rimLayer.opacity = spotlightOn ? 1 : 0
         panel.contentView = view
         self.panel = panel
         panel.orderFrontRegardless()
@@ -295,7 +355,7 @@ final class SpotlightController: NSObject, NSMenuItemValidation {
 
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        if spotlightOn {
+        if spotlightOn || fadingOut {
             let hole = Self.spotlightPath(center: p, radius: settings.radius, shape: settings.shape)
             let path = CGMutablePath()
             path.addRect(bounds)

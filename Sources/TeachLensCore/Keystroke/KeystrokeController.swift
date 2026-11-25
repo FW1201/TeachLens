@@ -287,7 +287,8 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
     }
 
     private func addRipple(x: Double, y: Double, secondary: Bool) {
-        guard panel != nil else { return }
+        // With a fixed shared screen, clicks on the other display are not shown.
+        guard panel != nil, screenFrame.contains(CGPoint(x: x, y: y)) else { return }
         let local = CGPoint(x: x - screenFrame.minX, y: y - screenFrame.minY)
         let ripple = ClickRipple(point: local, isSecondary: secondary)
         model.ripples.append(ripple)
@@ -503,6 +504,8 @@ final class KeystrokeController: NSObject, NSMenuItemValidation {
             menuItem.state = settings.showMouseEvents ? .on : .off
         case #selector(toggleClickRipples):
             menuItem.state = settings.showClickRipples ? .on : .off
+            // Ripples come from the same input listener as the keystroke pills.
+            return settings.enabled
         case #selector(toggleHistory):
             menuItem.state = settings.showHistory ? .on : .off
         case #selector(toggleWindowsEquivalent):
