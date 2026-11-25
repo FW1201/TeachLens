@@ -268,10 +268,14 @@ struct KeystrokeEngine: Sendable {
     /// leaves after `soloModifierLinger`, so typing ⌘C never flashes "⌘" first
     /// and a quick ⌘ tap shows nothing at all. Holding ⌥ to explain it still
     /// shows it.
+    ///
+    /// With the shortcuts filter, modifiers alone never show: the HUD appears
+    /// only once a full combination (modifier plus another key) is pressed.
     func visibleGroups(at now: TimeInterval) -> [KeystrokeGroup] {
         groups.filter { group in
             guard !group.keys.isEmpty,
                   group.keys.allSatisfy({ KeyName.modifiers.contains($0.name) }) else { return true }
+            if config.filter == .modifiers { return false }
             let held = group.keys.filter { pressedKeys.contains($0.name) }
             if let firstHeld = held.map(\.pressStartedAt).min() {
                 return now - firstHeld >= config.soloModifierDelay
