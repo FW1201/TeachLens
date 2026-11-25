@@ -153,6 +153,15 @@ final class SpotlightController: NSObject, NSMenuItemValidation {
     private var escapeMonitors: [Any] = []
     /// Spotlight that is fading out: still drawn until the fade ends.
     private var fadingOut = false
+    /// "Hide all overlays" (⌃⌥⌘H): the cursor halo and shake-to-find pause
+    /// too, without changing the saved settings.
+    private(set) var suspended = false
+
+    func setSuspended(_ value: Bool) {
+        guard value != suspended else { return }
+        suspended = value
+        refreshRunningState()
+    }
 
     var onHotkeyChange: (() -> Void)?
 
@@ -254,7 +263,7 @@ final class SpotlightController: NSObject, NSMenuItemValidation {
     // MARK: Running state
 
     private var needsPanel: Bool {
-        spotlightOn || fadingOut || settings.highlightEnabled || settings.shakeToFind
+        !suspended && (spotlightOn || fadingOut || settings.highlightEnabled || settings.shakeToFind)
     }
 
     private func refreshRunningState() {
@@ -297,7 +306,9 @@ final class SpotlightController: NSObject, NSMenuItemValidation {
         panel.isReleasedWhenClosed = false
         // Below the zoom/draw overlay (screenSaver) so annotations stay bright,
         // above ordinary windows.
-        panel.level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue - 1)
+        // Two below screenSaver: the floating toolbar sits at screenSaver - 1,
+        // above this dimming but below capture and selection overlays.
+        panel.level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue - 2)
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         panel.animationBehavior = .none
 
