@@ -381,6 +381,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         if let hidden = hiddenOverlays {
             keystrokes.update { $0.enabled = hidden.keystrokes }
             spotlight.setSpotlight(hidden.spotlight)
+            spotlight.setSuspended(false)
             captions.setEnabled(hidden.captions)
             hiddenOverlays = nil
             GlassToast.shared.show(symbol: "eye", title: L10n.t("Overlays back", "已恢復畫面提示"))
@@ -388,6 +389,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             hiddenOverlays = (keystrokes.settings.enabled, spotlight.spotlightOn, captions.isRunning)
             keystrokes.update { $0.enabled = false }
             spotlight.setSpotlight(false)
+            spotlight.setSuspended(true)
             captions.setEnabled(false)
             GlassToast.shared.show(symbol: "eye.slash", title: L10n.t("All overlays hidden", "已隱藏所有畫面提示"),
                                    message: L10n.t("Press ⌃⌥⌘H again to bring them back.", "再按 ⌃⌥⌘H 恢復。"))

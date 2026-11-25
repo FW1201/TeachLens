@@ -25,7 +25,16 @@ struct KeystrokeSettingsPane: View {
                     Text(L10n.t("Every key", "每個鍵")).tag(KeystrokeFilter.none)
                 }
                 Toggle(L10n.t("Include mouse clicks in shortcuts", "快捷鍵包含滑鼠點擊"), isOn: $draft.showMouseEvents)
-                Toggle(L10n.t("Click ripples at the pointer", "點擊時顯示漣漪"), isOn: $draft.showClickRipples)
+                Toggle(isOn: $draft.showClickRipples) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(L10n.t("Click ripples at the pointer", "點擊時顯示漣漪"))
+                        if !draft.enabled {
+                            Text(L10n.t("Turn on “Show keystrokes on screen” first.", "需先開啟「在畫面上顯示按鍵」。"))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .disabled(!draft.enabled)
                 Picker(selection: $draft.primaryPlatform) {
                     ForEach(KeystrokePlatform.allCases, id: \.self) { platform in
                         Text(platform.shortTitle).tag(platform)

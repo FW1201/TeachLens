@@ -343,7 +343,10 @@ final class GraphicalTools: ObservableObject {
         window.hasShadow = false
         window.isReleasedWhenClosed = false
         window.hidesOnDeactivate = false
-        window.level = .floating
+        // Above the spotlight's dimming (screenSaver - 2), so the button that
+        // turns it off is never darkened, and below selection and capture
+        // overlays (screenSaver), which must stay on top.
+        window.level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue - 1)
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         // Recording, panorama and screenshots build their filters without an
         // exclusion list, so keep the launcher out of every capture here.
