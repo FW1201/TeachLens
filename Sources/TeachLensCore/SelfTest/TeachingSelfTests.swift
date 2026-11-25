@@ -108,6 +108,14 @@ enum TeachingSelfTests {
         try expect(GraphicalToolsLayout.expandedHeight(originY: home.y, in: screen, items: items, scale: 1) == wanted,
                    "The open toolbar should fit its six tools without empty space")
         try expect(wanted < 400, "Six tools should need well under 400 pt, got \(wanted)")
+        for size in ToolbarSize.allCases {
+            let scale = size.scale
+            let available = GraphicalToolsLayout.columnHeight(items: items, scale: scale)
+                - GraphicalToolsLayout.columnPadding
+                - CGFloat(items) * (TeachLensChrome.iconHeight * scale + GraphicalToolsLayout.rowSpacing)
+            try expect(abs(available - 24 * scale) < 0.001,
+                       "The eye marker should have a 24 pt row that scales with toolbar size")
+        }
         // Large buttons make it taller and wider; small ones smaller.
         let large = GraphicalToolsLayout.expandedHeight(originY: home.y, in: screen, items: items, scale: ToolbarSize.large.scale)
         let small = GraphicalToolsLayout.expandedHeight(originY: home.y, in: screen, items: items, scale: ToolbarSize.small.scale)
